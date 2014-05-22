@@ -1,0 +1,4009 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                          NAM FLEX SOURCE
+0000                          INCLUDE "f9-moneq.txt"
+
+
+f9-moneq.txt                                                                      page   2
+0002                         * 
+0003                         ***************************************************
+0004                         *   MEMORY MAP EQUATES                            *
+0005                         ***************************************************
+0006 E000                    MONIO   EQU  $E000  I/O SPACE
+0007 DFC0                    MONRAM  EQU  $DFC0  STACK SPACE
+0008 F800                    MONROM  EQU  $F800  START OF ROM
+0009 F000                    MONEXT  EQU  $F000  EXTENDED COMMANDS
+0010                         *MONEXT  EQU  $1000  EXTENDED COMMANDS
+0011                         *
+0012                         ***************************************************
+0013                         *   SYS09BUG VARIABLE SPACE
+0014                         ***************************************************
+0015                         * 
+0016 DFC0                    STACK   EQU  MONRAM+0  TOP OF INTERNAL STACK / USER VECTOR 
+0017 DFC2                    SWI3    EQU  MONRAM+2  SOFTWARE INTERRUPT VECTOR #3 
+0018 DFC4                    SWI2    EQU  MONRAM+4  SOFTWARE INTERRUPT VECTOR #2 
+0019 DFC6                    FIRQ    EQU  MONRAM+6  FAST INTERRUPT VECTOR 
+0020 DFC8                    IRQ     EQU  MONRAM+8  INTERRUPT VECTOR 
+0021 DFCA                    SWI     EQU  MONRAM+10 SOFTWARE INTERRUPT VECTOR 
+0022 DFCC                    SVCVO   EQU  MONRAM+12 SUPERVISOR CALL VECTOR ORGIN 
+0023 DFCE                    SVCVL   EQU  MONRAM+14 SUPERVISOR CALL VECTOR LIMIT 
+0024 DFD0                    LRARAM  EQU  MONRAM+16 LRA ADDRESSES 
+0025 DFE0                    CPORT   EQU  MONRAM+32 RE-VECTORABLE CONTROL PORT 
+0026 DFE2                    ECHO    EQU  MONRAM+34 ECHO FLAG 
+0027 DFE3                    BPTBL   EQU  MONRAM+35 BREAKPOINT TABLE BASE ADDR 
+0028                         **************************************************
+0029                         *   VDU BYTES                                    *
+0030                         **************************************************
+0031                         *
+0032                         **** ALWAYS KEEP COLADX AND ROWADX TOGETHER ******
+0033 DFFB                    COLADX  EQU  MONRAM+59 CURSOR COLUMN
+0034 DFFC                    ROWADX  EQU  MONRAM+60 CURSOR ROW
+0035                         **************************************************
+0036                         *
+0037 DFFD                    NEWROW  EQU  MONRAM+61 NEW ROW TEMP FOR ESCAPE
+0038 DFFE                    ESCFLG  EQU  MONRAM+62 ESCAPE SEQUENCE ACTIVE
+0039                         * 
+0040                         ***************************************************
+0041                         *   SERIAL PORT                                   *
+0042                         ***************************************************
+0043                         *
+0044 E000                    ACIAS   EQU  MONIO+$00   CONTROL PORT 
+0045                         * 
+0046                         ***************************************************
+0047                         *   PS/2 KEYBOARD PORT                            *
+0048                         ***************************************************
+0049                         *
+0050 E020                    PS2KBD  EQU  MONIO+$20   PS/2 KEYBOARD PORT 
+0051                         * 
+0052                         ***************************************************
+0053                         *   ADM3A DISPLAY DRIVER VARIABLES                *
+0054                         ***************************************************
+0055                         *
+0056                         ** VIDEO DISPLAY DEFINITIONS
+0057                         *
+0058 E030                    VDU     EQU  MONIO+$30
+0059 0000                    VDUCHR  EQU  0        CHARACTER REGISTER
+0060 0001                    VDUATT  EQU  1        ATTRIBUTE REGISTER
+0061 0002                    VDUCOL  EQU  2        CURSOR COLUMN
+0062 0003                    VDUROW  EQU  3        CURSOR ROW
+0063 0004                    VDUOFF  EQU  4        ROW OFFSET
+0064                         *
+0065 0050                    LINLEN  EQU  80       LENGTH OF A LINE
+0066 0019                    NUMLIN  EQU  25       NUMBER OF LINES
+0067                         * 
+0068                         ***************************************************
+0069                         * Serial PROM register
+0070                         ***************************************************
+0071                         *
+0072                         ** CONFIGURATION PROM DEFINITIONS
+0073                         *
+0074 E0C0                    PROMREG EQU MONIO+$C0
+0075 0001                    PCLKHI  EQU $01     Toggle PROM Clock High
+0076 0000                    PCLKLO  EQU $00     Toggle PROM Clock Low
+0077 0002                    PRSTHI  EQU $02     Toggle PROM Reset High
+0078 0000                    PRSTLO  EQU $00     Toggle PROM Reset Low
+0079 AA55                    SYNCHI  EQU $AA55   Synch Pattern High Word
+0080 FF00                    SYNCLO  EQU $FF00   Synch Pattern Low Word
+0081                         *
+0082                         * 
+0083                         ***************************************************
+0084                         * Dynamic Address Translation Registers
+0085                         ***************************************************
+0086                         *
+0087                         ** DAT Table
+0088                         *
+0089 FFF0                    IC11    EQU  $FFF0  DAT RAM CHIP 
+0090                         *
+0091                         ***************************************************
+0092                         *   START OF ROM                                  *
+0093                         ***************************************************
+0094                         *
+0095 F800                    MONITV EQU MONROM+0  FDB MONITOR 
+0096 F802                    NXTCMV EQU MONROM+2  FDB NEXTCMD 
+0097 F804                    INCHV  EQU MONROM+4  FDB INCH 
+0098 F806                    INCHEV EQU MONROM+6  FDB INCHE 
+0099 F808                    INCHKV EQU MONROM+8  FDB INCHEK 
+0100 F80A                    OUTCHV EQU MONROM+10 FDB OUTCH 
+0101 F80C                    PDATAV EQU MONROM+12 FDB PDATA 
+0102 F80E                    PCRLFV EQU MONROM+14 FDB PCRLF 
+0103 F810                    PSTRGV EQU MONROM+16 FDB PSTRNG 
+0104 F812                    LRAV   EQU MONROM+18 FDB LRA 
+0002                                END
+0000                          INCLUDE "f9-equ.txt"
+0001 0000                    Z0000 EQU $0000
+0002 0005                    Z0005 EQU $0005
+0003 0044                    Z0044 EQU $0044
+0004 00A0                    Z00A0 EQU $00A0
+0005 C07F                    ZC07F EQU $C07F
+0006 C080                    LINBUF EQU $C080
+0007 C0FF                    ZC0FF EQU $C0FF
+0003                          END
+0000                          INCLUDE "f9-spool.txt"
+0001                         *
+0002                         ** PRINTER SPOOLING
+0003                         *
+0004 C700                     ORG $C700
+0005 C700 7E C7 21           PRSPL1 JMP ZC721
+0006 C703 7E C7 03           PRSPL2 JMP *
+0007 C706 7E C7 47           PRSPL3 JMP ZC747
+0008 C709 7E C7 85           PRSPL4 JMP ZC785
+0009 C70C 7E C7 95           PRSPL5 JMP ZC795
+0010 C70F 7E C7 1F           PRSPL6 JMP ZC71F
+0011                         *
+0012                         ** SPOOLER SCRATCH AREA
+0013                         *
+0014 C712 0C 00 00 00 00 C8  ZC712 FCB $0C,$00,$00,$00,$00,$C8,$10
+          10
+0015 C719 C8 10              ZC719 FCB $C8,$10
+0016 C71B 00                 QCNT FCB $00
+0017 C71C 00                 ZC71C FCB $00
+0018 C71D 00                 ZC71D FCB $00
+0019 C71E 00                 ZC71E FCB $00
+0020                         *
+0021 C71F 3B                 ZC71F RTI
+0022 C720 12                  NOP
+0023                         *
+0024 C721 1A 10              ZC721 ORCC #$10
+0025 C723 BE CC 31            LDX ZCC31
+0026 C726 10 EF 02            STS 2,X
+0027 C729 7D CC 34            TST ZCC34
+0028 C72C 26 11               BNE ZC73F
+0029 C72E 8E CC FC            LDX #ZCCFC
+0030 C731 7C CC 34            INC ZCC34
+0031 C734 6D 84               TST ,X
+0032 C736 27 07               BEQ ZC73F
+0033 C738 BF CC 31           ZC738 STX ZCC31
+0034 C73B 10 EE 02            LDS $02,X
+0035 C73E 3B                  RTI 
+0036                         *
+0037 C73F 8E CC F8           ZC73F LDX #ZCCF8
+0038 C742 7F CC 34            CLR ZCC34
+0039 C745 20 F1               BRA ZC738
+0040                         *
+0041 C747 1A 10              ZC747 ORCC #$10
+0042 C749 7D C7 1B            TST QCNT
+0043 C74C 27 29               BEQ ZC777
+0044 C74E BE C7 19            LDX ZC719
+0045 C751 A6 84               LDA ,X
+0046 C753 34 02               PSHS A
+0047 C755 EC 01               LDD $01,X
+0048 C757 8E CA C0            LDX #ZCAC0
+0049 C75A ED 88 40            STD $40,X
+0050 C75D 35 02               PULS A
+0051 C75F A7 03               STA $03,X
+0052 C761 6F 84               CLR ,X
+0053 C763 86 01               LDA #$01
+0054 C765 A7 02               STA $02,X
+0055 C767 6F 88 22            CLR $22,X
+0056 C76A 6F 88 3B            CLR $3B,X
+0057 C76D 7D C7 1E           ZC76D TST ZC71E
+0058 C770 27 29               BEQ ZC79B
+0059 C772 11 3F               SWI3 
+0060 C774 12                  NOP 
+0061 C775 20 F6               BRA ZC76D
+0062                         *
+0063 C777 1C EF              ZC777 ANDCC #$EF
+0064 C779 AD 9F D3 ED        ZC779 JSR [TOFVEC]
+0065 C77D 7F CC FC            CLR ZCCFC
+0066 C780 11 3F               SWI3 
+0067 C782 12                  NOP 
+0068 C783 20 F4               BRA ZC779
+0069                         *
+0070 C785 1A 10              ZC785 ORCC #$10
+0071 C787 7D CC 30            TST ZCC30
+0072 C78A 27 05               BEQ ZC791
+0073 C78C 11 3F               SWI3 
+0074 C78E 12                  NOP 
+0075 C78F 20 F4               BRA ZC785
+0076                         *
+0077 C791 7C CC 30           ZC791 INC ZCC30
+0078 C794 39                  RTS 
+0079                         *
+0080 C795 7F CC 30           ZC795 CLR ZCC30
+0081 C798 1C EF               ANDCC #$EF
+0082 C79A 39                  RTS 
+0083                         *
+0084 C79B 7D C7 1D           ZC79B TST ZC71D
+0085 C79E 26 27               BNE ZC7C7
+0086 C7A0 8E CA C0            LDX #ZCAC0
+0087 C7A3 BD D4 06            JSR FMS
+0088 C7A6 26 1F               BNE ZC7C7
+0089 C7A8 7D C7 1C            TST ZC71C
+0090 C7AB 27 0F               BEQ ZC7BC
+0091 C7AD 7F C7 1C            CLR ZC71C
+0092 C7B0 81 0A               CMPA #$0A
+0093 C7B2 27 0F               BEQ ZC7C3
+0094 C7B4 34 02               PSHS A
+0095 C7B6 86 0A               LDA #$0A
+0096 C7B8 8D 3C               BSR ZC7F6
+0097 C7BA 35 02               PULS A
+0098 C7BC 81 0D              ZC7BC CMPA #$0D
+0099 C7BE 26 03               BNE ZC7C3
+0100 C7C0 B7 C7 1C            STA ZC71C
+0101 C7C3 8D 31              ZC7C3 BSR ZC7F6
+0102 C7C5 20 D4               BRA ZC79B
+0103                         *
+0104 C7C7 86 0D              ZC7C7 LDA #$0D
+0105 C7C9 8D 2B               BSR ZC7F6
+0106 C7CB 86 0A               LDA #$0A
+0107 C7CD 8D 27               BSR ZC7F6
+0108 C7CF B6 C7 12            LDA ZC712
+0109 C7D2 8D 22               BSR ZC7F6
+0110 C7D4 7F C7 1D            CLR ZC71D
+0111 C7D7 BE C7 19            LDX ZC719
+0112 C7DA 6D 03               TST $03,X
+0113 C7DC 27 05               BEQ ZC7E3
+0114 C7DE 6A 03               DEC $03,X
+0115 C7E0 7E C7 47            JMP ZC747
+0116                         *
+0117 C7E3 30 04              ZC7E3 LEAX $04,X
+0118 C7E5 8C C8 40            CMPX #FCB
+0119 C7E8 26 03               BNE ZC7ED
+0120 C7EA 8E C8 10            LDX #ZC810
+0121 C7ED BF C7 19           ZC7ED STX ZC719
+0122 C7F0 7A C7 1B            DEC QCNT
+0123 C7F3 7E C7 47            JMP ZC747
+0124                         *
+0125 C7F6 BD CC D8           ZC7F6 JSR PCHK
+0126 C7F9 2B 05               BMI ZC800
+0127 C7FB 11 3F               SWI3 
+0128 C7FD 12                  NOP 
+0129 C7FE 20 F6               BRA ZC7F6
+0130                         *
+0131 C800 7E CC E4           ZC800 JMP POUT
+0132 C810                    ZC810 EQU $C810
+0133 C838                    ZC838 EQU $C838
+0004                          END
+0000                          INCLUDE "f9-sfcb.txt"
+0001                         *
+0002                         ** SYSTEM FILE CONTROL BLOCK
+0003                         *
+0004 C840                     ORG $C840
+0005 C840 FF                 FCB FCB $FF
+0006 C841 00                  FCB $00
+0007 C842 00                  FCB $00
+0008 C843 00                  FCB $00
+0009 C844 53 54 41 52 54 55  ZC844 FCC "STARTUP"
+          50
+0010 C84B 00                  FCB $00
+0011 C84C 54 58 54            FCC "TXT"
+0012 C84F 00                  FCB $00
+0005                          END
+0000                          INCLUDE "f9-init.txt"
+0001                         *
+0002                         ** FLEX INITIATION
+0003                         *
+0004 CA00                     ORG $CA00
+0005 CA00 20 06              ZCA00 BRA ZCA08
+0006 CA02 BD CA AC           ZCA02 JSR >ZCAAC
+0007 CA05 39                  RTS 
+0008 CA06 C0 A0              ZCA06 SUBB #$A0
+0009 CA08 86 39              ZCA08 LDA #$39
+0010 CA0A B7 D3 FD            STA >ZD3FD
+0011 CA0D BE CC 2B            LDX >MEMEND
+0012 CA10 30 89 00 A1         LEAX $00A1,X
+0013 CA14 BF CA 06            STX >ZCA06
+0014 CA17 AD 9F D3 F1         JSR [TINVEC]
+0015 CA1B BE D3 FB            LDX >INVEC
+0016 CA1E BF CD 0A            STX >INCH+1
+0017 CA21 BF CD 0D            STX >INCH2+1
+0018 CA24 BE D3 F9            LDX >OUTVEC
+0019 CA27 BF CD 10            STX >OUTCH+1
+0020 CA2A BF CD 13            STX >OUTCH2+1
+0021 CA2D BE D3 F7            LDX >STAVEC
+0022 CA30 BF CD 4F            STX >ZCD4E+1
+0023 CA33 8E 00 A0            LDX #Z00A0
+0024 CA36 C6 B9               LDB #$B9
+0025 CA38 A6 84              ZCA38 LDA ,X
+0026 CA3A E7 84               STB ,X
+0027 CA3C 12                  NOP 
+0028 CA3D E1 84               CMPB ,X
+0029 CA3F 26 0B               BNE ZCA4C
+0030 CA41 A7 84               STA ,X
+0031 CA43 30 89 04 00         LEAX $0400,X
+0032 CA47 BC CA 06            CMPX >ZCA06
+0033 CA4A 26 EC               BNE ZCA38
+0034 CA4C 30 89 FF 5F        ZCA4C LEAX $FF5F,X
+0035 CA50 BF CC 2B            STX >MEMEND
+0036 CA53 8E CD 03            LDX #WARMS
+0037 CA56 BF CC 16            STX >ESCVEC
+0038 CA59 8E CA DC            LDX #TTLSTR
+0039 CA5C BD CE 81            JSR >PSTRG1
+0040 CA5F BD CE B5            JSR >PCRLF1
+0041 CA62 8D 9E               BSR ZCA02
+0042 CA64 BD CE B5            JSR >PCRLF1
+0043 CA67 8E C8 40            LDX #FCB
+0044 CA6A 86 01               LDA #$01
+0045 CA6C A7 84               STA ,X
+0046 CA6E BD D4 06            JSR >FMS
+0047 CA71 27 08               BEQ ZCA7B
+0048 CA73 A6 01               LDA $01,X
+0049 CA75 BD D2 00            JSR >ZD200
+0050 CA78 7E CD 67            JMP >WARM1
+0051                         
+0052 CA7B 8E C0 80           ZCA7B LDX #LINBUF
+0053 CA7E BF CC 14           ZCA7E STX >LINPTR
+0054 CA81 8E C8 40            LDX #FCB
+0055 CA84 BD D4 06            JSR >FMS
+0056 CA87 27 05               BEQ ZCA8E
+0057 CA89 34 30               PSHS Y,X
+0058 CA8B 7E D2 D7            JMP >ZD2D7
+0059                         
+0060 CA8E BE CC 14           ZCA8E LDX >LINPTR
+0061 CA91 A7 80               STA ,X+
+0062 CA93 81 0D               CMPA #$0D
+0063 CA95 26 E7               BNE ZCA7E
+0064 CA97 8E C8 40            LDX #FCB
+0065 CA9A BD D1 F4            JSR >ZD1F4
+0066 CA9D 8E C0 80            LDX #LINBUF
+0067 CAA0 BF CC 14            STX >LINPTR
+0068 CAA3 8E CD 67            LDX #WARM1
+0069 CAA6 BF CC 43            STX >ZCC43
+0070 CAA9 7E D3 2E            JMP >ZD32E
+0071                         
+0072 CAAC 8E CA EC           ZCAAC LDX #DATSTR
+0073 CAAF BD CE 81            JSR >PSTRG1
+0074 CAB2 BD CE 2B            JSR >INBUF1
+0075 CAB5 8D 14               BSR ZCACB
+0076 CAB7 25 F3               BCS ZCAAC
+0077 CAB9 B7 CC 0E            STA >MONTH
+0078 CABC 8D 0D               BSR ZCACB
+0079 CABE 25 EC               BCS ZCAAC
+0080 CAC0 B7 CC 0F           ZCAC0 STA >DAY
+0081 CAC3 8D 06               BSR ZCACB
+0082 CAC5 25 E5               BCS ZCAAC
+0083 CAC7 B7 CC 10            STA >YEAR
+0084 CACA 39                  RTS 
+0085                         
+0086 CACB BD D1 75           ZCACB JSR >INDEC1
+0087 CACE 25 0B               BCS ZCADB
+0088 CAD0 B6 CC 1C            LDA >LODOFF+1
+0089 CAD3 5D                  TSTB 
+0090 CAD4 27 03               BEQ ZCAD9
+0091 CAD6 1C FE               ANDCC #$FE
+0092 CAD8 39                  RTS 
+0093                         
+0094 CAD9 1A 01              ZCAD9 ORCC #$01
+0095 CADB 39                 ZCADB RTS 
+0096                         
+0097 CADC 36 38 30 39 20 46  TTLSTR FCC "6809 FLEX V3.01"
+          4C 45 58 20 56 33
+          2E 30 31
+0098 CAEB 04                  FCB $04
+0099 CAEC 44 41 54 45 20 28  DATSTR FCC "DATE (MM,DD,YY)? "
+          4D 4D 2C 44 44 2C
+          59 59 29 3F 20
+0100 CAFD 04                  FCB $04
+0006                          END
+0000                          INCLUDE "f9-var.txt"
+0001                         *
+0002                         ** TTYSET PARAMETERS
+0003                         *
+0004 CC00                     ORG $CC00
+0005 CC00 08                 BSPCHR FCB $08
+0006 CC01 18                 DELCHR FCB $18
+0007 CC02 3A                 EOLCHR FCB $3A
+0008 CC03 19                 DEPCNT FCB 25
+0009 CC04 00                 WIDCNT FCB $00
+0010 CC05 04                 NULCNT FCB $04
+0011 CC06 40                 TABCHR FCB '@
+0012 CC07 00                 BSECHR FCB $00
+0013 CC08 00                 EJTCNT FCB $00
+0014 CC09 FF                 PAUSE FCB $FF
+0015 CC0A 1B                 ESCCHR FCB $1B
+0016 CC0B 00                 SYSDRV FCB 0
+0017 CC0C 01                 WRKDRV FCB 1
+0018 CC0D 00                 ZCC0D FCB $00
+0019 CC0E                    DATERG EQU *
+0020 CC0E 00                 MONTH FCB $00
+0021 CC0F 00                 DAY FCB $00
+0022 CC10 00                 YEAR FCB $00
+0023 CC11 00                 LASTRM FCB $00
+0024 CC12 00 00              UCTVEC FDB $0000
+0025 CC14 00 00              LINPTR FDB $0000
+0026 CC16 00 00              ESCVEC FDB $0000
+0027 CC18 00                 CURCHR FCB $00
+0028 CC19 00                 PRVCHR FCB $00
+0029 CC1A 00                 CURLIN FCB $00
+0030 CC1B 00 00              LODOFF FDB $0000
+0031 CC1D 00                 TRNFLG FCB $00
+0032 CC1E 00 00              TRNVEC FDB $0000
+0033 CC20 00                 ERRTYP FCB $00
+0034 CC21 00                 SIOFLG FCB $00
+0035 CC22 00                 OUTSWT FCB $00
+0036 CC23 00                 INPSWT FCB $00
+0037 CC24 00 00              FOPADR FDB $0000
+0038 CC26 00 00              FIPADR FDB $0000
+0039 CC28 00                 CMDFLG FCB $00
+0040 CC29 00                 CURCOL FCB $00
+0041 CC2A 00                  FCB $00
+0042 CC2B BF FF              MEMEND FDB $BFFF
+0043 CC2D 00 00              ERRVEC FDB $0000
+0044 CC2F 01                 FIEFLG FCB $01
+0045 CC30 00                 ZCC30 FCB $00
+0046 CC31 00 00 00           ZCC31 FCB $00,$00,$00
+0047 CC34 00 00 00 00 00 00  ZCC34 FCB $00,$00,$00,$00,$00,$00,$00
+          00
+0048 CC3D                    ZCC3D EQU $CC3D
+0049 CC3F                    ZCC3F EQU $CC3F
+0050 CC43                    ZCC43 EQU $CC43
+0051 CC45                    ZCC45 EQU $CC45
+0052 CC47                    ZCC47 EQU $CC47
+0053 CC49                     ORG $CC49
+0054 CC49 60                 MAPUP FCB $60 MAP LOWER TO UPPERCASE
+0055 CC4A                    ZCC4A EQU $CC4A
+0056 CC4B                    ZCC4B EQU $CC4B
+0057 CC4C                    ZCC4C EQU $CC4C
+0058 CC4D                    ZCC4D EQU $CC4D
+0007                          END
+0000                          INCLUDE "f9-data.txt"
+0001                         *
+0002                         ** STRINGS AND MESSAGES
+0003                         *
+0004 CC4E                     ORG $CC4E
+0005 CC4E 2B 2B 2B           PMTSTR FCC "+++"
+0006 CC51 04                  FCB $04
+0007 CC52 3F 3F 3F           QRYSTR FCC "???"
+0008 CC55 04                  FCB $04
+0009 CC56 57 48 41 54 3F     WOTMSG FCC "WHAT?"
+0010 CC5B 04                  FCB $04
+0011 CC5C 43 41 4E 27 54 20  NTRMSG FCC "CAN'T TRANSFER"
+          54 52 41 4E 53 46
+          45 52
+0012 CC6A 04                  FCB $04
+0013 CC6B 4E 4F 54 20 46 4F  NFDMSG FCC "NOT FOUND"
+          55 4E 44
+0014 CC74 04                  FCB $04
+0015 CC75 44 49 53 4B 20 45  DERMSG FCC "DISK ERROR #"
+          52 52 4F 52 20 23
+0016 CC81 04                  FCB $04
+0017 CC82 44 52 49 56 45 53  DNRMSG FCC "DRIVES NOT READY"
+          20 4E 4F 54 20 52
+          45 41 44 59
+0018 CC92 04                  FCB $04
+0019                         *
+0020                         ** MEMORY RESIDENT COMMANDS
+0021                         *
+0022 CC93 47 45 54           CMDTBL FCC "GET"
+0023 CC96 00                  FCB $00
+0024 CC97 D2 0F               FDB GETCMD
+0025 CC99 4D 4F 4E            FCC "MON"
+0026 CC9C 00                  FCB $00
+0027 CC9D D3 4B               FDB ZD34B
+0028 CC9F 00                  FCB $00
+0029                         *
+0030                         ** DECIMAL CONVERSION TABLE
+0031                         *
+0032 CCA0 27 10              DECTBL FDB 10000
+0033 CCA2 03 E8               FDB 1000
+0034 CCA4 00 64               FDB 100
+0035 CCA6 00 0A               FDB 10
+0008                          END
+0000                          INCLUDE "f9-cli.txt"
+0001                         *********************************************
+0002                         *
+0003                         * FLEX COMMAND LINE INTERPRETER & SUBROUTINES
+0004                         *
+0005                         *********************************************
+0006 CD00                     ORG $CD00
+0007                         *
+0008                         ** FLEX JUMPS
+0009                         *
+0010 CD00 7E CD 57           COLDS JMP >COLD1
+0011 CD03 7E CD 67           WARMS JMP >WARM1
+0012 CD06 7E CD B1           RENTER JMP >RENT1
+0013 CD09 7E CD 09           INCH JMP >INCH
+0014 CD0C 7E CD 0C           INCH2 JMP >INCH2
+0015 CD0F 7E CD 0F           OUTCH JMP >OUTCH
+0016 CD12 7E CD 12           OUTCH2 JMP >OUTCH2
+0017 CD15 7E CE FB           GETCHR JMP >GETCH1
+0018 CD18 7E CF 41           PUTCHR JMP >PUTCH1
+0019 CD1B 7E CE 2B           INBUFF JMP >INBUF1
+0020 CD1E 7E CE 81           PSTRNG JMP >PSTRG1
+0021 CD21 7E CF ED           CLASS JMP >CLASS1
+0022 CD24 7E CE B5           PCRLF JMP >PCRLF1
+0023 CD27 7E D0 0E           NXTCH JMP >NXTCH1
+0024 CD2A 7E CD EA           RSTRIO JMP >RSTIO1
+0025 CD2D 7E D0 36           GETFIL JMP >GETFL1
+0026 CD30 7E D1 A2           LOAD JMP >LOAD1
+0027 CD33 7E D0 EB           SETEXT JMP >SETEX1
+0028 CD36 7E D3 49           ADDBX JMP >ADDBX1
+0029 CD39 7E CF 86           OUTDEC JMP >OUTDC1
+0030 CD3C 7E CF D4           OUTHEX JMP >OUTHX1
+0031 CD3F 7E D2 7F           RPTERR JMP >RPTER1
+0032 CD42 7E D1 2F           GETHEX JMP >GETHX1
+0033 CD45 7E CF D0           OUTADR JMP >OUTAD1
+0034 CD48 7E D1 75           INDEC JMP >INDEC1
+0035 CD4B 7E D3 29           DOCMND JMP >DOCMD1
+0036 CD4E 7E CD 4E           ZCD4E JMP >ZCD4E
+0037 CD51 7E CE 05            JMP >ZCE05
+0038 CD54 7E CE 05            JMP >ZCE05
+0039                         *
+0040                         ** COLD START ENTRY
+0041                         *
+0042 CD57 10 CE C0 7F        COLD1 LDS #ZC07F
+0043 CD5B 7F CC 11           ZCD5B CLR >LASTRM
+0044 CD5E BD D4 00            JSR >ZD400
+0045 CD61 7F CC 28            CLR >CMDFLG
+0046 CD64 BD D3 FD            JSR >ZD3FD
+0047                         *
+0048                         ** WARM START ENTRY
+0049                         *
+0050 CD67 10 CE C0 7F        WARM1 LDS #ZC07F
+0051 CD6B BD DE 18            JSR >WARMDR
+0052 CD6E 8E CD 03            LDX #WARMS
+0053 CD71 BF CC 16            STX >ESCVEC
+0054 CD74 8E C7 00            LDX #PRSPL1
+0055 CD77 AF 9F D3 E9         STX [SWIVVC]
+0056 CD7B BE D3 E7            LDX >IHNDVC
+0057 CD7E AF 9F D3 EB         STX [IRQVVC]
+0058 CD82 8E CC F8            LDX #ZCCF8
+0059 CD85 BF CC 31            STX >ZCC31
+0060 CD88 7F CC 34            CLR >ZCC34
+0061 CD8B 7F CC 4C            CLR >ZCC4C
+0062 CD8E 8D 5A               BSR RSTIO1
+0063 CD90 B6 CC 11            LDA >LASTRM
+0064 CD93 B1 CC 02            CMPA >EOLCHR
+0065 CD96 26 05               BNE ZCD9D
+0066 CD98 7C CC 15            INC >LINPTR+1
+0067 CD9B 20 14               BRA RENT1
+0068                         
+0069 CD9D 7D CC 28           ZCD9D TST >CMDFLG
+0070 CDA0 10 26 05 97         LBNE ZD33B
+0071 CDA4 BD D4 03            JSR >FMSCLS
+0072 CDA7 26 B2               BNE ZCD5B
+0073 CDA9 8E CC 4E            LDX #PMTSTR
+0074 CDAC BD CE 81            JSR >PSTRG1
+0075 CDAF 8D 7A               BSR INBUF1
+0076                         *
+0077                         ** MAIN CONTROL LOOP
+0078                         *
+0079 CDB1 BD D0 D4           RENT1 JSR >ZD0D4
+0080 CDB4 81 0D               CMPA #$0D
+0081 CDB6 27 E5               BEQ ZCD9D
+0082 CDB8 8E C8 40           ZCDB8 LDX #FCB
+0083 CDBB 7C CC 0D            INC >ZCC0D
+0084 CDBE BD D0 36            JSR >GETFL1
+0085 CDC1 25 16               BCS ZCDD9
+0086 CDC3 8E CC 93            LDX #CMDTBL
+0087 CDC6 8D 3E               BSR ZCE06
+0088 CDC8 27 09               BEQ ZCDD3
+0089 CDCA BE CC 12            LDX >UCTVEC
+0090 CDCD 27 07               BEQ ZCDD6
+0091 CDCF 8D 35               BSR ZCE06
+0092 CDD1 26 03               BNE ZCDD6
+0093 CDD3 6E 98 01           ZCDD3 JMP [$01,X]
+0094                         
+0095 CDD6 BD D2 2E           ZCDD6 JSR >ZD22E
+0096 CDD9 8E CC 56           ZCDD9 LDX #WOTMSG
+0097 CDDC 86 15               LDA #$15
+0098 CDDE B7 CC 20           ZCDDE STA >ERRTYP
+0099 CDE1 BD CE 81           ZCDE1 JSR >PSTRG1
+0100 CDE4 7F CC 11           ZCDE4 CLR >LASTRM
+0101 CDE7 7E CD 67            JMP >WARM1
+0102                         *
+0103                         ** RESTORE IO VECTORS
+0104                         *
+0105 CDEA BE CD 13           RSTIO1 LDX >OUTCH2+1
+0106 CDED BF CD 10            STX >OUTCH+1
+0107 CDF0 BE CD 0D            LDX >INCH2+1
+0108 CDF3 BF CD 0A            STX >INCH+1
+0109 CDF6 7F CC 23            CLR >INPSWT
+0110 CDF9 7F CC 22            CLR >OUTSWT
+0111 CDFC 7F CC 21            CLR >SIOFLG
+0112 CDFF 7F CC 26            CLR >FIPADR
+0113 CE02 7F CC 24            CLR >FOPADR
+0114 CE05 39                 ZCE05 RTS 
+0115                         
+0116 CE06 10 8E C8 44        ZCE06 LDY #ZC844
+0117 CE0A A6 A0              ZCE0A LDA ,Y+
+0118 CE0C 81 5F               CMPA #$5F
+0119 CE0E 23 02               BLS ZCE12
+0120 CE10 80 20               SUBA #$20
+0121 CE12 A1 80              ZCE12 CMPA ,X+
+0122 CE14 26 08               BNE ZCE1E
+0123 CE16 6D 84               TST ,X
+0124 CE18 26 F0               BNE ZCE0A
+0125 CE1A 6D A4               TST ,Y
+0126 CE1C 27 0C               BEQ ZCE2A
+0127 CE1E 6D 80              ZCE1E TST ,X+
+0128 CE20 26 FC               BNE ZCE1E
+0129 CE22 30 02               LEAX $02,X
+0130 CE24 6D 84               TST ,X
+0131 CE26 26 DE               BNE ZCE06
+0132 CE28 1C FB               ANDCC #$FB
+0133 CE2A 39                 ZCE2A RTS 
+0134                         *
+0135                         ** GET USER COMMAND LINE
+0136                         *
+0137 CE2B 8E C0 80           INBUF1 LDX #LINBUF
+0138 CE2E BF CC 14            STX >LINPTR
+0139 CE31 BD CE FB           ZCE31 JSR >GETCH1
+0140 CE34 B1 CC 01            CMPA >DELCHR
+0141 CE37 27 1D               BEQ ZCE56
+0142 CE39 B1 CC 00            CMPA >BSPCHR
+0143 CE3C 27 1F               BEQ ZCE5D
+0144 CE3E 81 0D               CMPA #$0D
+0145 CE40 27 0D               BEQ ZCE4F
+0146 CE42 81 0A               CMPA #$0A
+0147 CE44 27 32               BEQ ZCE78
+0148 CE46 81 1F               CMPA #$1F
+0149 CE48 23 E7               BLS ZCE31
+0150 CE4A 8C C0 FF           ZCE4A CMPX #ZC0FF
+0151 CE4D 27 E2               BEQ ZCE31
+0152 CE4F A7 80              ZCE4F STA ,X+
+0153 CE51 81 0D               CMPA #$0D
+0154 CE53 26 DC               BNE ZCE31
+0155 CE55 39                  RTS 
+0156                         
+0157 CE56 8E CC 52           ZCE56 LDX #QRYSTR
+0158 CE59 8D 26               BSR PSTRG1
+0159 CE5B 20 CE               BRA INBUF1
+0160                         
+0161 CE5D 8C C0 80           ZCE5D CMPX #LINBUF
+0162 CE60 27 F4               BEQ ZCE56
+0163 CE62 30 1F               LEAX -$01,X
+0164 CE64 B6 CC 07            LDA >BSECHR
+0165 CE67 81 08               CMPA #$08
+0166 CE69 26 08               BNE ZCE73
+0167 CE6B 86 20               LDA #$20
+0168 CE6D BD CF 66            JSR >ZCF66
+0169 CE70 B6 CC 07            LDA >BSECHR
+0170 CE73 BD CF 66           ZCE73 JSR >ZCF66
+0171 CE76 20 B9               BRA ZCE31
+0172                         
+0173 CE78 86 0D              ZCE78 LDA #$0D
+0174 CE7A BD CF 41            JSR >PUTCH1
+0175 CE7D 86 20               LDA #$20
+0176 CE7F 20 C9               BRA ZCE4A
+0177                         
+0178 CE81 8D 32              PSTRG1 BSR PCRLF1
+0179 CE83 A6 84              ZCE83 LDA ,X
+0180 CE85 81 04               CMPA #$04
+0181 CE87 27 6F               BEQ ZCEF8
+0182 CE89 BD CF 41            JSR >PUTCH1
+0183 CE8C 30 01               LEAX $01,X
+0184 CE8E 20 F3               BRA ZCE83
+0185                         
+0186 CE90 BD CD 4E           ZCE90 JSR >ZCD4E
+0187 CE93 27 65               BEQ ZCEFA
+0188 CE95 AD 9F D3 E5         JSR [ZD3E5]
+0189 CE99 B1 CC 0A            CMPA >ESCCHR
+0190 CE9C 26 5C               BNE ZCEFA
+0191 CE9E 7F CC 1A           ZCE9E CLR >CURLIN
+0192 CEA1 AD 9F D3 E5        ZCEA1 JSR [ZD3E5]
+0193 CEA5 B1 CC 0A            CMPA >ESCCHR
+0194 CEA8 27 50               BEQ ZCEFA
+0195 CEAA 81 03               CMPA #$03 CTRL C
+0196 CEAC 26 F3               BNE ZCEA1
+0197 CEAE 7F CC 11            CLR >LASTRM
+0198 CEB1 6E 9F CC 16         JMP [ESCVEC]
+0199                         *
+0200                         ** PRINT CR, LINEFEED
+0201                         *
+0202 CEB5 7D CC 21           PCRLF1 TST >SIOFLG
+0203 CEB8 26 27               BNE ZCEE1
+0204 CEBA 8D D4               BSR ZCE90
+0205 CEBC B6 CC 03            LDA >DEPCNT
+0206 CEBF 27 20               BEQ ZCEE1
+0207 CEC1 B1 CC 1A            CMPA >CURLIN
+0208 CEC4 22 18               BHI ZCEDE
+0209 CEC6 7F CC 1A            CLR >CURLIN
+0210 CEC9 7D CC 09            TST >PAUSE
+0211 CECC 27 02               BEQ ZCED0
+0212 CECE 8D CE               BSR ZCE9E
+0213 CED0 34 04              ZCED0 PSHS B
+0214 CED2 F6 CC 08            LDB >EJTCNT
+0215 CED5 27 05               BEQ ZCEDC
+0216 CED7 8D 08              ZCED7 BSR ZCEE1
+0217 CED9 5A                  DECB 
+0218 CEDA 26 FB               BNE ZCED7
+0219 CEDC 35 04              ZCEDC PULS B
+0220 CEDE 7C CC 1A           ZCEDE INC >CURLIN
+0221 CEE1 86 0D              ZCEE1 LDA #$0D
+0222 CEE3 8D 5C               BSR PUTCH1
+0223 CEE5 86 0A               LDA #$0A
+0224 CEE7 8D 58               BSR PUTCH1
+0225 CEE9 34 04               PSHS B
+0226 CEEB F6 CC 05            LDB >NULCNT
+0227 CEEE 27 06               BEQ ZCEF6
+0228 CEF0 4F                 ZCEF0 CLRA 
+0229 CEF1 8D 4E               BSR PUTCH1
+0230 CEF3 5A                  DECB 
+0231 CEF4 26 FA               BNE ZCEF0
+0232 CEF6 35 04              ZCEF6 PULS B
+0233 CEF8 1C FE              ZCEF8 ANDCC #$FE
+0234 CEFA 39                 ZCEFA RTS 
+0235                         *
+0236                         ** GET A CHARACTER HONOURING TTYSET
+0237                         *
+0238 CEFB 7D CC 23           GETCH1 TST >INPSWT
+0239 CEFE 26 1A               BNE ZCF1A
+0240 CF00 7D CC 26            TST >FIPADR
+0241 CF03 27 10               BEQ ZCF15
+0242 CF05 8D 1A               BSR ZCF21
+0243 CF07 7D CC 2F            TST >FIEFLG
+0244 CF0A 27 11               BEQ ZCF1D
+0245 CF0C 7D CC 24            TST >FOPADR
+0246 CF0F 27 0C               BEQ ZCF1D
+0247 CF11 8D 53               BSR ZCF66
+0248 CF13 20 08               BRA ZCF1D
+0249 CF15 BD CD 09           ZCF15 JSR >INCH
+0250 CF18 20 03               BRA ZCF1D
+0251                         
+0252 CF1A BD CD 0C           ZCF1A JSR >INCH2
+0253 CF1D 7F CC 1A           ZCF1D CLR >CURLIN
+0254 CF20 39                  RTS 
+0255                         
+0256 CF21 BF CC 47           ZCF21 STX >ZCC47
+0257 CF24 BE CC 26            LDX >FIPADR
+0258 CF27 20 06               BRA ZCF2F
+0259                         
+0260 CF29 BF CC 47           ZCF29 STX >ZCC47
+0261 CF2C BE CC 24            LDX >FOPADR
+0262 CF2F BD D4 06           ZCF2F JSR >FMS
+0263 CF32 26 04               BNE ZCF38
+0264 CF34 BE CC 47            LDX >ZCC47
+0265 CF37 39                  RTS 
+0266                         
+0267 CF38 7F CC 24           ZCF38 CLR >FOPADR
+0268 CF3B BD D2 7F            JSR >RPTER1
+0269 CF3E 7E CD 03            JMP >WARMS
+0270                         *
+0271                         ** OUTPUT CHARACTER HONOURING TTYSET
+0272                         *
+0273 CF41 7D CC 21           PUTCH1 TST >SIOFLG
+0274 CF44 26 20               BNE ZCF66
+0275 CF46 81 1F               CMPA #$1F
+0276 CF48 22 05               BHI ZCF4F
+0277 CF4A 7F CC 29            CLR >CURCOL
+0278 CF4D 20 17               BRA ZCF66
+0279                         
+0280 CF4F 7C CC 29           ZCF4F INC >CURCOL
+0281 CF52 34 02               PSHS A
+0282 CF54 B6 CC 04            LDA >WIDCNT
+0283 CF57 27 0B               BEQ ZCF64
+0284 CF59 B1 CC 29            CMPA >CURCOL
+0285 CF5C 24 06               BCC ZCF64
+0286 CF5E BD CE B5            JSR >PCRLF1
+0287 CF61 7C CC 29            INC >CURCOL
+0288 CF64 35 02              ZCF64 PULS A
+0289 CF66 34 02              ZCF66 PSHS A
+0290 CF68 7D CC 22            TST >OUTSWT
+0291 CF6B 26 13               BNE ZCF80
+0292 CF6D 7D CC 24            TST >FOPADR
+0293 CF70 27 04               BEQ ZCF76
+0294 CF72 8D B5               BSR ZCF29
+0295 CF74 20 0D               BRA ZCF83
+0296                         
+0297 CF76 7D CC 26           ZCF76 TST >FIPADR
+0298 CF79 26 08               BNE ZCF83
+0299 CF7B BD CD 0F            JSR >OUTCH
+0300 CF7E 20 03               BRA ZCF83
+0301 CF80 BD CD 12           ZCF80 JSR >OUTCH2
+0302 CF83 35 02              ZCF83 PULS A
+0303 CF85 39                  RTS 
+0304                         
+0305 CF86 7F CC 4A           OUTDC1 CLR >ZCC4A
+0306 CF89 F7 CC 1D            STB >TRNFLG
+0307 CF8C 86 04               LDA #$04
+0308 CF8E B7 CC 4D            STA >ZCC4D
+0309 CF91 EC 84               LDD ,X
+0310 CF93 8E CC A0            LDX #DECTBL
+0311 CF96 8D 0B              ZCF96 BSR ZCFA3
+0312 CF98 30 02               LEAX $02,X
+0313 CF9A 7A CC 4D            DEC >ZCC4D
+0314 CF9D 26 F7               BNE ZCF96
+0315 CF9F 1F 98               TFR B,A
+0316 CFA1 20 3D               BRA OUTHXR
+0317                         
+0318 CFA3 7F CC 4B           ZCFA3 CLR >ZCC4B
+0319 CFA6 10 A3 84           ZCFA6 CMPD ,X
+0320 CFA9 25 07               BCS ZCFB2
+0321 CFAB A3 84               SUBD ,X
+0322 CFAD 7C CC 4B            INC >ZCC4B
+0323 CFB0 20 F4               BRA ZCFA6
+0324                         
+0325 CFB2 34 02              ZCFB2 PSHS A
+0326 CFB4 B6 CC 4B            LDA >ZCC4B
+0327 CFB7 26 10               BNE ZCFC9
+0328 CFB9 7D CC 4A            TST >ZCC4A
+0329 CFBC 26 0B               BNE ZCFC9
+0330 CFBE 7D CC 1D            TST >TRNFLG
+0331 CFC1 27 0B               BEQ ZCFCE
+0332 CFC3 86 20               LDA #$20
+0333 CFC5 8D 23               BSR ZCFEA
+0334 CFC7 20 05               BRA ZCFCE
+0335                         
+0336 CFC9 7C CC 4A           ZCFC9 INC >ZCC4A
+0337 CFCC 8D 12               BSR OUTHXR
+0338 CFCE 35 82              ZCFCE PULS PC,A
+0339                         *
+0340                         ** DISPLAY HEX ADDRESS
+0341                         *
+0342 CFD0 8D 02              OUTAD1 BSR OUTHX1
+0343 CFD2 30 01               LEAX $01,X
+0344                         *
+0345                         ** OUPUT HEX BYTE
+0346                         *
+0347 CFD4 A6 84              OUTHX1 LDA ,X
+0348 CFD6 8D 04               BSR OUTHXL
+0349 CFD8 A6 84               LDA ,X
+0350 CFDA 20 04               BRA OUTHXR
+0351                         
+0352 CFDC 44                 OUTHXL LSRA
+0353 CFDD 44                  LSRA 
+0354 CFDE 44                  LSRA 
+0355 CFDF 44                  LSRA 
+0356 CFE0 84 0F              OUTHXR ANDA #$0F
+0357 CFE2 8B 30               ADDA #$30
+0358 CFE4 81 39               CMPA #$39
+0359 CFE6 23 02               BLS ZCFEA
+0360 CFE8 8B 07               ADDA #$07
+0361 CFEA 7E CF 41           ZCFEA JMP >PUTCH1
+0362                         *
+0363                         ** CLASSIFY CHARACTER ALHA/NUMERIC
+0364                         *
+0365 CFED 81 30              CLASS1 CMPA #'0
+0366 CFEF 25 14               BCS ZD005
+0367 CFF1 81 39               CMPA #'9
+0368 CFF3 23 16               BLS ZD00B
+0369 CFF5 81 41               CMPA #'A
+0370 CFF7 25 0C               BCS ZD005
+0371 CFF9 81 5A               CMPA #'Z
+0372 CFFB 23 0E               BLS ZD00B
+0373 CFFD 81 61               CMPA #'a $61
+0374 CFFF 25 04               BCS ZD005
+0375 D001 81 7A               CMPA #'z $7A
+0376 D003 23 06               BLS ZD00B
+0377 D005 1A 01              ZD005 ORCC #$01
+0378 D007 B7 CC 11            STA >LASTRM
+0379 D00A 39                  RTS 
+0380 D00B 1C FE              ZD00B ANDCC #$FE
+0381 D00D 39                  RTS 
+0382                         *
+0383                         ** GET NEXT CHARACTER FROM FILE
+0384                         *
+0385 D00E 34 10              NXTCH1 PSHS X
+0386 D010 BE CC 14            LDX >LINPTR
+0387 D013 B6 CC 18            LDA >CURCHR
+0388 D016 B7 CC 19            STA >PRVCHR
+0389 D019 A6 80              ZD019 LDA ,X+
+0390 D01B B7 CC 18            STA >CURCHR
+0391 D01E 81 0D               CMPA #$0D
+0392 D020 27 10               BEQ ZD032
+0393 D022 B1 CC 02            CMPA >EOLCHR
+0394 D025 27 0B               BEQ ZD032
+0395 D027 BF CC 14            STX >LINPTR
+0396 D02A 81 20               CMPA #$20
+0397 D02C 26 04               BNE ZD032
+0398 D02E A1 84               CMPA ,X
+0399 D030 27 E7               BEQ ZD019
+0400 D032 8D B9              ZD032 BSR CLASS1
+0401 D034 35 90               PULS PC,X
+0402                         *
+0403                         ** PARSE FILE SPEC. IN LINE BUFFER
+0404                         *
+0405 D036 86 15              GETFL1 LDA #$15
+0406 D038 A7 01               STA $01,X
+0407 D03A 86 FF               LDA #$FF
+0408 D03C A7 03               STA $03,X
+0409 D03E 6F 04               CLR $04,X
+0410 D040 6F 0C               CLR $0C,X
+0411 D042 BD D0 D4            JSR >ZD0D4
+0412 D045 86 08               LDA #$08
+0413 D047 B7 CC 4B            STA >ZCC4B
+0414 D04A 8D 34               BSR ZD080
+0415 D04C 25 2E               BCS ZD07C
+0416 D04E 26 0F               BNE ZD05F
+0417 D050 8D 2E               BSR ZD080
+0418 D052 25 28               BCS ZD07C
+0419 D054 26 09               BNE ZD05F
+0420 D056 BC CC 3F            CMPX >ZCC3F
+0421 D059 27 6C               BEQ ZD0C7
+0422 D05B 8D 23               BSR ZD080
+0423 D05D 23 68               BLS ZD0C7
+0424 D05F BE CC 3F           ZD05F LDX >ZCC3F
+0425 D062 6D 04               TST $04,X
+0426 D064 27 61               BEQ ZD0C7
+0427 D066 6D 03               TST $03,X
+0428 D068 2A 0F               BPL ZD079
+0429 D06A 7D CC 0D            TST >ZCC0D
+0430 D06D 27 05               BEQ ZD074
+0431 D06F B6 CC 0B            LDA >SYSDRV
+0432 D072 20 03               BRA ZD077
+0433                         
+0434 D074 B6 CC 0C           ZD074 LDA >WRKDRV
+0435 D077 A7 03              ZD077 STA $03,X
+0436 D079 7F CC 0D           ZD079 CLR >ZCC0D
+0437 D07C BE CC 3F           ZD07C LDX >ZCC3F
+0438 D07F 39                  RTS 
+0439                         
+0440 D080 8D 8C              ZD080 BSR NXTCH1
+0441 D082 25 43               BCS ZD0C7
+0442 D084 81 39               CMPA #$39
+0443 D086 22 15               BHI ZD09D
+0444 D088 BE CC 3F            LDX >ZCC3F
+0445 D08B 6D 03               TST $03,X
+0446 D08D 2A 38               BPL ZD0C7
+0447 D08F 84 03               ANDA #$03
+0448 D091 A7 03               STA $03,X
+0449 D093 BD D0 0E            JSR >NXTCH1
+0450 D096 24 2F               BCC ZD0C7
+0451 D098 81 2E              ZD098 CMPA #$2E
+0452 D09A 1C FE               ANDCC #$FE
+0453 D09C 39                  RTS 
+0454                         
+0455 D09D F6 CC 4B           ZD09D LDB >ZCC4B
+0456 D0A0 2B 25               BMI ZD0C7
+0457 D0A2 34 04               PSHS B
+0458 D0A4 C0 05               SUBB #$05
+0459 D0A6 F7 CC 4B            STB >ZCC4B
+0460 D0A9 35 04               PULS B
+0461 D0AB B1 CC 49           ZD0AB CMPA >MAPUP
+0462 D0AE 25 02               BCS ZD0B2
+0463 D0B0 80 20               SUBA #$20
+0464 D0B2 A7 04              ZD0B2 STA $04,X
+0465 D0B4 30 01               LEAX $01,X
+0466 D0B6 5A                  DECB 
+0467 D0B7 BD D0 0E            JSR >NXTCH1
+0468 D0BA 24 08               BCC ZD0C4
+0469 D0BC 81 2D               CMPA #$2D
+0470 D0BE 27 04               BEQ ZD0C4
+0471 D0C0 81 5F               CMPA #$5F
+0472 D0C2 26 06               BNE ZD0CA
+0473 D0C4 5D                 ZD0C4 TSTB 
+0474 D0C5 26 E4               BNE ZD0AB
+0475 D0C7 1A 01              ZD0C7 ORCC #$01
+0476 D0C9 39                  RTS 
+0477                         
+0478 D0CA 5D                 ZD0CA TSTB 
+0479 D0CB 27 CB               BEQ ZD098
+0480 D0CD 6F 04               CLR $04,X
+0481 D0CF 30 01               LEAX $01,X
+0482 D0D1 5A                  DECB 
+0483 D0D2 20 F6               BRA ZD0CA
+0484                         
+0485 D0D4 BF CC 3F           ZD0D4 STX >ZCC3F
+0486 D0D7 BE CC 14            LDX >LINPTR
+0487 D0DA A6 84              ZD0DA LDA ,X
+0488 D0DC 81 20               CMPA #$20
+0489 D0DE 26 04               BNE ZD0E4
+0490 D0E0 30 01               LEAX $01,X
+0491 D0E2 20 F6               BRA ZD0DA
+0492 D0E4 BF CC 14           ZD0E4 STX >LINPTR
+0493 D0E7 BE CC 3F            LDX >ZCC3F
+0494 D0EA 39                  RTS 
+0495                         *
+0496                         ** DEFAULT FILE EXTENSION
+0497                         *
+0498 D0EB 34 30              SETEX1 PSHS Y,X
+0499 D0ED E6 0C               LDB $0C,X
+0500 D0EF 26 18               BNE ZD109
+0501 D0F1 10 8E D1 0B         LDY #EXTTBL
+0502 D0F5 81 0B               CMPA #$0B
+0503 D0F7 22 10               BHI ZD109
+0504 D0F9 C6 03               LDB #$03
+0505 D0FB 3D                  MUL 
+0506 D0FC 31 A5               LEAY B,Y
+0507 D0FE C6 03               LDB #$03
+0508 D100 A6 A0              ZD100 LDA ,Y+
+0509 D102 A7 0C               STA $0C,X
+0510 D104 30 01               LEAX $01,X
+0511 D106 5A                  DECB 
+0512 D107 26 F7               BNE ZD100
+0513 D109 35 B0              ZD109 PULS PC,Y,X
+0514                         *
+0515                         ** STANDARD FILE NAME EXTTENSIONS
+0516                         *
+0517 D10B 42 49 4E           EXTTBL FCC "BIN"
+0518 D10E 54 58 54            FCC "TXT"
+0519 D111 43 4D 44            FCC "CMD"
+0520 D114 42 41 53            FCC "BAS"
+0521 D117 53 59 53            FCC "SYS"
+0522 D11A 42 41 4B            FCC "BAK"
+0523 D11D 53 43 52            FCC "SCR"
+0524 D120 44 41 54            FCC "DAT"
+0525 D123 42 41 43            FCC "BAC"
+0526 D126 44 49 52            FCC "DIR"
+0527 D129 50 52 54            FCC "PRT"
+0528 D12C 4F 55 54            FCC "OUT"
+0529                         *
+0530                         ** READ A HEX ADDRESS FROM THE LINE BUFFER
+0531                         *
+0532 D12F BD D2 1E           GETHX1 JSR >ZD21E
+0533 D132 BD D0 0E           ZD132 JSR >NXTCH1
+0534 D135 25 22               BCS ZD159
+0535 D137 8D 26               BSR ZD15F
+0536 D139 25 18               BCS ZD153
+0537 D13B 34 04               PSHS B
+0538 D13D C6 04               LDB #$04
+0539 D13F 78 CC 1C           ZD13F ASL >LODOFF+1
+0540 D142 79 CC 1B            ROL >LODOFF
+0541 D145 5A                  DECB 
+0542 D146 26 F7               BNE ZD13F
+0543 D148 35 04               PULS B
+0544 D14A BB CC 1C            ADDA >LODOFF+1
+0545 D14D B7 CC 1C            STA >LODOFF+1
+0546 D150 5C                  INCB 
+0547 D151 20 DF               BRA ZD132
+0548                         
+0549 D153 BD D0 0E           ZD153 JSR >NXTCH1
+0550 D156 24 FB               BCC ZD153
+0551 D158 39                  RTS 
+0552                         
+0553 D159 BE CC 1B           ZD159 LDX >LODOFF
+0554 D15C 1C FE               ANDCC #$FE
+0555 D15E 39                  RTS 
+0556                         
+0557 D15F 80 47              ZD15F SUBA #$47
+0558 D161 2A 0F               BPL ZD172
+0559 D163 8B 06               ADDA #$06
+0560 D165 2A 04               BPL ZD16B
+0561 D167 8B 07               ADDA #$07
+0562 D169 2A 07               BPL ZD172
+0563 D16B 8B 0A              ZD16B ADDA #$0A
+0564 D16D 2B 03               BMI ZD172
+0565 D16F 1C FE               ANDCC #$FE
+0566 D171 39                  RTS 
+0567                         
+0568 D172 1A 01              ZD172 ORCC #$01
+0569 D174 39                  RTS 
+0570                         
+0571 D175 BD D2 1E           INDEC1 JSR >ZD21E
+0572 D178 BD D0 0E           ZD178 JSR >NXTCH1
+0573 D17B 25 DC               BCS ZD159
+0574 D17D 81 39               CMPA #$39
+0575 D17F 22 D2               BHI ZD153
+0576 D181 84 0F               ANDA #$0F
+0577 D183 34 04               PSHS B
+0578 D185 34 02               PSHS A
+0579 D187 FC CC 1B            LDD >LODOFF
+0580 D18A 58                  ASLB 
+0581 D18B 49                  ROLA 
+0582 D18C 58                  ASLB 
+0583 D18D 49                  ROLA 
+0584 D18E 58                  ASLB 
+0585 D18F 49                  ROLA 
+0586 D190 F3 CC 1B            ADDD >LODOFF
+0587 D193 F3 CC 1B            ADDD >LODOFF
+0588 D196 EB E0               ADDB ,S+
+0589 D198 89 00               ADCA #$00
+0590 D19A FD CC 1B            STD >LODOFF
+0591 D19D 35 04               PULS B
+0592 D19F 5C                  INCB 
+0593 D1A0 20 D6               BRA ZD178
+0594                         *
+0595                         ** LOAD BINARY FILE
+0596                         *
+0597 D1A2 7F CC 1D           LOAD1 CLR >TRNFLG
+0598 D1A5 8D 3D              ZD1A5 BSR ZD1E4
+0599 D1A7 81 02               CMPA #$02
+0600 D1A9 27 15               BEQ ZD1C0
+0601 D1AB 81 16               CMPA #$16
+0602 D1AD 26 F6               BNE ZD1A5
+0603 D1AF 8D 33               BSR ZD1E4
+0604 D1B1 B7 CC 1E            STA >TRNVEC
+0605 D1B4 8D 2E               BSR ZD1E4
+0606 D1B6 B7 CC 1F            STA >TRNVEC+1
+0607 D1B9 86 01               LDA #$01
+0608 D1BB B7 CC 1D            STA >TRNFLG
+0609 D1BE 20 E5               BRA ZD1A5
+0610                         
+0611 D1C0 8D 22              ZD1C0 BSR ZD1E4
+0612 D1C2 1F 89               TFR A,B
+0613 D1C4 8D 1E               BSR ZD1E4
+0614 D1C6 1E 89               EXG A,B
+0615 D1C8 F3 CC 1B            ADDD >LODOFF
+0616 D1CB FD CC 3D            STD >ZCC3D
+0617 D1CE 8D 14               BSR ZD1E4
+0618 D1D0 1F 89               TFR A,B
+0619 D1D2 4D                  TSTA 
+0620 D1D3 27 D0               BEQ ZD1A5
+0621 D1D5 8D 0D              ZD1D5 BSR ZD1E4
+0622 D1D7 BE CC 3D            LDX >ZCC3D
+0623 D1DA A7 80               STA ,X+
+0624 D1DC BF CC 3D            STX >ZCC3D
+0625 D1DF 5A                  DECB 
+0626 D1E0 26 F3               BNE ZD1D5
+0627 D1E2 20 C1               BRA ZD1A5
+0628                         
+0629 D1E4 8E C8 40           ZD1E4 LDX #FCB
+0630 D1E7 BD D4 06            JSR >FMS
+0631 D1EA 27 11               BEQ ZD1FD
+0632 D1EC A6 01               LDA $01,X
+0633 D1EE 81 08               CMPA #$08
+0634 D1F0 26 0E               BNE ZD200
+0635 D1F2 32 62               LEAS $02,S
+0636 D1F4 86 04              ZD1F4 LDA #$04
+0637 D1F6 A7 84               STA ,X
+0638 D1F8 BD D4 06            JSR >FMS
+0639 D1FB 26 0D               BNE ZD20A
+0640 D1FD 1C FE              ZD1FD ANDCC #$FE
+0641 D1FF 39                  RTS 
+0642                         
+0643 D200 B7 CC 20           ZD200 STA >ERRTYP
+0644 D203 81 04               CMPA #$04
+0645 D205 26 03               BNE ZD20A
+0646 D207 1A 01               ORCC #$01
+0647 D209 39                  RTS 
+0648                         
+0649 D20A 8D 73              ZD20A BSR RPTER1
+0650 D20C 7E CD E4            JMP >ZCDE4
+0651                         *
+0652                         ** 'GET' - LOAD BINARY FILE
+0653                         *
+0654 D20F 86 00              GETCMD LDA #$00
+0655 D211 8D 35               BSR ZD248
+0656 D213 25 0F               BCS ZD224
+0657 D215 8D 07               BSR ZD21E
+0658 D217 7C CC 4C            INC >ZCC4C
+0659 D21A 8D 86               BSR LOAD1
+0660 D21C 20 F1               BRA GETCMD
+0661                         
+0662 D21E 4F                 ZD21E CLRA 
+0663 D21F 5F                  CLRB 
+0664 D220 FD CC 1B            STD >LODOFF
+0665 D223 39                  RTS 
+0666                         
+0667 D224 F6 CC 4C           ZD224 LDB >ZCC4C
+0668 D227 10 27 FB AE         LBEQ ZCDD9
+0669 D22B 7E CD 03            JMP >WARMS
+0670                         
+0671 D22E 86 02              ZD22E LDA #$02
+0672 D230 8D 22               BSR ZD254
+0673 D232 8D EA               BSR ZD21E
+0674 D234 BD D1 A2            JSR >LOAD1
+0675 D237 F6 CC 1D            LDB >TRNFLG
+0676 D23A 27 04               BEQ ZD240
+0677 D23C 6E 9F CC 1E         JMP [TRNVEC]
+0678                         
+0679 D240 8E CC 5C           ZD240 LDX #NTRMSG
+0680 D243 86 81               LDA #$81
+0681 D245 7E CD DE            JMP >ZCDDE
+0682                         
+0683 D248 34 02              ZD248 PSHS A
+0684 D24A 8E C8 40            LDX #FCB
+0685 D24D BD D0 36            JSR >GETFL1
+0686 D250 35 02               PULS A
+0687 D252 25 1A               BCS ZD26E
+0688 D254 8E C8 40           ZD254 LDX #FCB
+0689 D257 BD D0 EB            JSR >SETEX1
+0690 D25A 8E C8 40            LDX #FCB
+0691 D25D 86 01               LDA #$01
+0692 D25F A7 84               STA ,X
+0693 D261 BD D1 E4            JSR >ZD1E4
+0694 D264 10 25 00 BB         LBCS ZD323
+0695 D268 86 FF               LDA #$FF
+0696 D26A A7 88 3B            STA $3B,X
+0697 D26D 39                  RTS 
+0698                         
+0699 D26E B6 CC 11           ZD26E LDA >LASTRM
+0700 D271 81 0D               CMPA #$0D
+0701 D273 27 07               BEQ ZD27C
+0702 D275 B1 CC 02            CMPA >EOLCHR
+0703 D278 10 26 FB 5D         LBNE ZCDD9
+0704 D27C 1A 01              ZD27C ORCC #$01
+0705 D27E 39                  RTS 
+0706                         
+0707 D27F 34 30              RPTER1 PSHS Y,X
+0708 D281 A6 01               LDA $01,X
+0709 D283 B7 CC 20            STA >ERRTYP
+0710 D286 27 63               BEQ ZD2EB
+0711 D288 BD CD EA            JSR >RSTIO1
+0712 D28B 10 BE CC 2D         LDY >ERRVEC
+0713 D28F 26 08               BNE ZD299
+0714 D291 81 10               CMPA #$10
+0715 D293 27 58               BEQ ZD2ED
+0716 D295 10 8E D3 61         LDY #ZD361
+0717 D299 8E C8 40           ZD299 LDX #FCB
+0718 D29C 6D 02               TST $02,X
+0719 D29E 27 09               BEQ ZD2A9
+0720 D2A0 86 04               LDA #$04
+0721 D2A2 A7 84               STA ,X
+0722 D2A4 BD D4 06            JSR >FMS
+0723 D2A7 26 2E               BNE ZD2D7
+0724 D2A9 8E C8 38           ZD2A9 LDX #ZC838
+0725 D2AC C6 0B               LDB #$0B
+0726 D2AE 8D 6E               BSR ZD31E
+0727 D2B0 8E C8 40            LDX #FCB
+0728 D2B3 B6 CC 0B            LDA >SYSDRV
+0729 D2B6 A7 03               STA $03,X
+0730 D2B8 86 01               LDA #$01
+0731 D2BA A7 84               STA ,X
+0732 D2BC BD D4 06            JSR >FMS
+0733 D2BF 26 16               BNE ZD2D7
+0734 D2C1 B6 CC 20            LDA >ERRTYP
+0735 D2C4 4A                  DECA 
+0736 D2C5 47                  ASRA 
+0737 D2C6 47                  ASRA 
+0738 D2C7 4C                  INCA 
+0739 D2C8 6F 88 20            CLR $20,X
+0740 D2CB A7 88 21            STA $21,X
+0741 D2CE 86 15               LDA #$15
+0742 D2D0 A7 84               STA ,X
+0743 D2D2 BD D4 06            JSR >FMS
+0744 D2D5 27 1E               BEQ ZD2F5
+0745 D2D7 8E CC 75           ZD2D7 LDX #DERMSG
+0746 D2DA BD CE 81            JSR >PSTRG1
+0747 D2DD BE CC 3F            LDX >ZCC3F
+0748 D2E0 B6 CC 20            LDA >ERRTYP
+0749 D2E3 A7 01               STA $01,X
+0750 D2E5 6F 84               CLR ,X
+0751 D2E7 5F                  CLRB 
+0752 D2E8 BD CF 86            JSR >OUTDC1
+0753 D2EB 35 B0              ZD2EB PULS PC,Y,X
+0754                         
+0755 D2ED 8E CC 82           ZD2ED LDX #DNRMSG
+0756 D2F0 BD CE 81            JSR >PSTRG1
+0757 D2F3 20 F6               BRA ZD2EB
+0758                         
+0759 D2F5 BD CE B5           ZD2F5 JSR >PCRLF1
+0760 D2F8 8E C8 40            LDX #FCB
+0761 D2FB B6 CC 20            LDA >ERRTYP
+0762 D2FE 4A                  DECA 
+0763 D2FF 84 03               ANDA #$03
+0764 D301 C6 3F               LDB #$3F
+0765 D303 3D                  MUL 
+0766 D304 CB 04               ADDB #$04
+0767 D306 E7 88 22            STB $22,X
+0768 D309 BD D4 06           ZD309 JSR >FMS
+0769 D30C 26 C9               BNE ZD2D7
+0770 D30E BD CF 41            JSR >PUTCH1
+0771 D311 81 0D               CMPA #$0D
+0772 D313 26 F4               BNE ZD309
+0773 D315 86 04               LDA #$04
+0774 D317 A7 84               STA ,X
+0775 D319 BD D4 06            JSR >FMS
+0776 D31C 20 CD               BRA ZD2EB
+0777 D31E 34 30              ZD31E PSHS Y,X
+0778 D320 7E D1 00            JMP >ZD100
+0779                         
+0780 D323 8E CC 6B           ZD323 LDX #NFDMSG NOT FOUND
+0781 D326 7E CD E1            JMP >ZCDE1
+0782                         *
+0783                         ** CALL FLEX AS A SUBROUTINE
+0784                         *
+0785 D329 35 06              DOCMD1 PULS B,A
+0786 D32B FD CC 43            STD >ZCC43
+0787 D32E 10 FF CC 45        ZD32E STS >ZCC45
+0788 D332 7F CC 20            CLR >ERRTYP
+0789 D335 7C CC 28            INC >CMDFLG
+0790 D338 7E CD B8            JMP >ZCDB8
+0791 D33B 7F CC 28           ZD33B CLR >CMDFLG
+0792 D33E 10 FE CC 45         LDS >ZCC45
+0793 D342 F6 CC 20            LDB >ERRTYP
+0794 D345 6E 9F CC 43         JMP [ZCC43]
+0795                         *
+0796                         ** ADD ACCB TO IX
+0797                         *
+0798 D349 3A                 ADDBX1 ABX
+0799 D34A 39                  RTS
+0800                         
+0801 D34B 7D CC FC           ZD34B TST >ZCCFC
+0802 D34E 26 04               BNE ZD354
+0803 D350 6E 9F D3 F3         JMP [MONVEC]
+0804                         
+0805 D354 8E C8 40           ZD354 LDX #FCB
+0806 D357 86 1B               LDA #$1B
+0807 D359 A7 01               STA $01,X
+0808 D35B BD D2 7F            JSR >RPTER1
+0809 D35E 7E CD 67            JMP >WARM1
+0810                         
+0811 D361 45 52 52 4F 52 53  ZD361 FCC /ERRORS/
+0812 D367 00 00               FCB $00,$00
+0813 D369 53 59 53            FCC /SYS/
+0009                          END
+0000                          INCLUDE "f9-monio.txt"
+0001                         *
+0002                         ** TERMINAL AND PRINTER DRIVERS
+0003                         ** SYS09BUG - Spartan 3 Starter Board
+0004                         *
+0005                         ** FLEX DRIVER MEMORY MAP:
+0006                         ** C700 - C83F  PRINTER SPOOLER
+0007                         ** CCC0 - CCF7  PRINTER DRIVERS
+0008                         ** D370 - D3FF  CONSOLE DRIVERS
+0009                         ** DE00 - DFAF  DISK DRIVERS
+0010                         *
+0011                         *
+0012                         ** INTERRUPT VECTORS
+0013                         *
+0014 DFC8                    IRQVEC EQU   MONRAM+$08
+0015 DFC2                    SWIVEC EQU   MONRAM+$02     SWI3 VECTOR
+0016                         *
+0017                         ** PRINTER DRIVERS
+0018                         *
+0019 CCC0                     ORG $CCC0
+0020 CCC0 7E D3 70           PINIT JMP DUMRTS INITIATE PRINTER
+0021 CCD8                     ORG $CCD8
+0022 CCD8 7E D3 70           PCHK JMP DUMRTS CHECK IF PRINTER READY
+0023 CCE4                     ORG $CCE4
+0024 CCE4 7E D3 70           POUT JMP DUMRTS OUTPUT CHR. TO PRINTER
+0025 CCF8                     ORG $CCF8
+0026 CCF8 01 00 00 00        ZCCF8 FCB $01,$00,$00,$00
+0027 CCFC 00 00 00 00        ZCCFC FCB $00,$00,$00,$00
+0028                         *
+0029                         ** CONSOLE DRIVER PATCHES:
+0030                         *
+0031 D370                           ORG $D370
+0032 D370                    IHND   EQU   *         INTERRUPT HANDLER
+0033 D370                    TMON   EQU   *         TIMER ON
+0034 D370                    TMOFF  EQU   *         TIMER OFF
+0035 D370                    TMINT  EQU   *         TIMER INITIALIZATION
+0036 D370                    DUMRTS EQU   *
+0037 D370 39                        RTS
+0038                         *
+0039                         ** SBUG MONITOR I/O CALLS
+0040                         *
+0041 D371 7E D3 70           TERINZ JMP DUMRTS   INITIATE ACIA
+0042 D374 6E 9F F8 04        INCHNE JMP [MONROM+$04] INPUT WITHOUT ECHO
+0043 D378 6E 9F F8 00        MONITR JMP [MONROM+$00]
+0044 D37C 6E 9F F8 08        INCHEK JMP [MONROM+$08] CHECK FOR TERMINAL ENTRY
+0045 D380 6E 9F F8 0A        OUTEEE JMP [MONROM+$0A] OUPUT CHARACTER
+0046 D384 6E 9F F8 06        INEEE  JMP [MONROM+$06] INPUT WITH ECHO
+0047                         
+0048                         *
+0049                         ** AUTO BLOCK FDBS
+0050                         *
+0051 D3E5                           ORG   $D3E5
+0052 D3E5 D3 74              ZD3E5  FDB   INCHNE    INPUT - NO ECHO
+0053 D3E7 D3 70              IHNDVC FDB   IHND      IRQ INTERRUPT HANDLER
+0054 D3E9 DF C2              SWIVVC FDB   SWIVEC    SWI3 VECTOR LOCATION
+0055 D3EB DF C8              IRQVVC FDB   IRQVEC    IRQ VECTOR LOCATION
+0056 D3ED D3 70              TOFVEC FDB   TMOFF     TIMER OFF ROUTINE
+0057 D3EF D3 70              TONVEC FDB   TMON      TIMER ON ROUTINE
+0058 D3F1 D3 70              TINVEC FDB   TMINT     TIMER INITIALIZE ROUTINE
+0059 D3F3 D3 78              MONVEC FDB   MONITR    MONITOR RETURN ADDRESS
+0060 D3F5 D3 71              TERVEC FDB   TERINZ    TERMINAL INITIATION
+0061 D3F7 D3 7C              STAVEC FDB   INCHEK    CHECK TERMINAL STATUS
+0062 D3F9 D3 80              OUTVEC FDB   OUTEEE    TERMINAL CHAR OUTPUT
+0063 D3FB D3 84              INVEC  FDB   INEEE     TERMINAL INPUT CHARACTER
+0064 D3FD 7E CA 00           ZD3FD  JMP   ZCA00
+0010                                END
+0000                          INCLUDE "f9-fms.txt"
+0001                         *
+0002                         ** FILE MANAGEMENT SYSTEM
+0003                         *
+0004 D400 7E D4 36           ZD400 JMP >ZD436
+0005 D403 7E D4 59           FMSCLS JMP >ZD459
+0006 D406 7E D4 7B           FMS JMP >FMS1
+0007 D409 20 44 49 53 4B 20  CPYMSG FCC / DISK OPERATING SYSTEM/
+          4F 50 45 52 41 54
+          49 4E 47 20 53 59
+          53 54 45 4D
+0008 D41F 20 43 4F 50 59 52   FCC / COPYRIGHT (C) 1980 BY/
+          49 47 48 54 20 28
+          43 29 20 31 39 38
+          30 20 42 59
+0009 D435 20 54 45 43 48 4E   FCC / TECHNICAL SYSTEMS CONSULTANTS/
+          49 43 41 4C 20 53
+          59 53 54 45 4D 53
+          20 43 4F 4E 53 55
+          4C 54 41 4E 54 53
+0010 D409                     ORG CPYMSG
+0011 D409                    FCBPTR RMB 2
+0012 D40B                    CURFCB RMB 4
+0013 D40F                    ZD40F RMB 2
+0014 D411                    ZD411 RMB 1
+0015 D412                    ZD412 RMB 1
+0016 D413                    ZD413 RMB 1
+0017 D414                    ZD414 RMB 1
+0018 D415                    ZD415 RMB 2
+0019 D417                    ZD417 RMB 1
+0020 D418                    ZD418 RMB 2
+0021 D41A                    ZD41A RMB 1
+0022 D41B                    ZD41B RMB 2
+0023 D41D                    ZD41D RMB 24
+0024 D435 FF                 VERFLG FCB $FF
+0025                         *
+0026                         **
+0027                         *
+0028 D436 BD DE 15           ZD436 JSR >COLDDR
+0029 D439 8E D4 09            LDX #FCBPTR
+0030 D43C C6 0A               LDB #$0A
+0031 D43E 8D 11               BSR ZD451
+0032 D440 8E 00 05            LDX #Z0005
+0033 D443 BF D4 13            STX >ZD413
+0034 D446 BF D4 15            STX >ZD415
+0035 D449 7F D4 1A            CLR >ZD41A
+0036 D44C 8E D4 1B           ZD44C LDX #ZD41B
+0037 D44F C6 1A               LDB #$1A
+0038 D451 6F 80              ZD451 CLR ,X+
+0039 D453 5A                  DECB 
+0040 D454 26 FB               BNE ZD451
+0041 D456 7E C7 0C            JMP >PRSPL5
+0042                         
+0043 D459 BD C7 09           ZD459 JSR >PRSPL4
+0044 D45C BE D4 09           ZD45C LDX >FCBPTR
+0045 D45F 27 EB               BEQ ZD44C
+0046 D461 30 88 E4            LEAX -$1C,X
+0047 D464 BF D4 0B            STX >CURFCB
+0048 D467 34 20               PSHS Y
+0049 D469 BD DA C3            JSR >CLOSE
+0050 D46C 35 20               PULS Y
+0051 D46E 24 EC               BCC ZD45C
+0052 D470 BE D4 0B            LDX >CURFCB
+0053 D473 6F 02               CLR $02,X
+0054 D475 BD C7 0C            JSR >PRSPL5
+0055 D478 C6 FF               LDB #$FF
+0056 D47A 39                  RTS 
+0057                         
+0058                         *
+0059                         ** FMS CALL, PROCESSING
+0060                         *
+0061 D47B 7D CC FC           FMS1 TST >ZCCFC
+0062 D47E 27 03               BEQ ZD483
+0063 D480 BD C7 09            JSR >PRSPL4
+0064 D483 34 24              ZD483 PSHS Y,B
+0065 D485 BF D4 0B            STX >CURFCB
+0066 D488 6F 01               CLR $01,X
+0067 D48A E6 84               LDB ,X
+0068 D48C 26 22               BNE DOFUNC
+0069                         *
+0070                         ** READ/WRITE CHAR/BYTE
+0071                         *
+0072 D48E E6 02               LDB $02,X
+0073 D490 27 1A               BEQ ZD4AC
+0074 D492 C1 02               CMPB #$02
+0075 D494 27 11               BEQ ZD4A7
+0076 D496 BD D5 B4            JSR >ZD5B4
+0077 D499 BE D4 0B           ZD499 LDX >CURFCB
+0078 D49C 25 26               BCS ZD4C4
+0079 D49E 7D CC FC            TST >ZCCFC
+0080 D4A1 26 23               BNE ZD4C6
+0081 D4A3 5F                  CLRB 
+0082 D4A4 35 24               PULS Y,B
+0083 D4A6 39                  RTS 
+0084                         
+0085 D4A7 BD D6 CF           ZD4A7 JSR >ZD6CF
+0086 D4AA 20 ED               BRA ZD499
+0087 D4AC C6 12              ZD4AC LDB #$12
+0088 D4AE 20 14               BRA ZD4C4
+0089                         
+0090 D4B0 C1 16              DOFUNC CMPB #$16
+0091 D4B2 23 04               BLS DOFUN1
+0092 D4B4 C6 01               LDB #$01
+0093 D4B6 20 0C               BRA ZD4C4
+0094 D4B8 5A                 DOFUN1 DECB
+0095 D4B9 58                  ASLB 
+0096 D4BA 8E D4 CE            LDX #FMSTBL
+0097 D4BD AD 95               JSR [B,X]
+0098 D4BF BE D4 0B            LDX >CURFCB
+0099 D4C2 24 02               BCC ZD4C6
+0100 D4C4 E7 01              ZD4C4 STB $01,X
+0101 D4C6 BD C7 0C           ZD4C6 JSR >PRSPL5
+0102 D4C9 6D 01               TST $01,X
+0103 D4CB 35 24               PULS Y,B
+0104 D4CD 39                  RTS 
+0105                         *
+0106                         ** FMS COMMAND VECTOR TABLE
+0107                         *
+0108 D4CE D9 86              FMSTBL FDB OPENRD FC 1
+0109 D4D0 D9 D9               FDB OPENWR FC 2
+0110 D4D2 DA F9               FDB OPENUD FC 3
+0111 D4D4 DA C3               FDB CLOSE FC 4
+0112 D4D6 D5 E2               FDB REWIND FC 5
+0113 D4D8 D8 1D               FDB OPNDIR FC 6
+0114 D4DA D8 38               FDB GETREC FC 7
+0115 D4DC D8 76               FDB PUTREC FC 8
+0116 D4DE D6 41               FDB RDSECT FC 9
+0117 D4E0 D6 9F               FDB WRSECT FC 10
+0118 D4E2 D9 69               FDB RESV1 FC 11
+0119 D4E4 DB D6               FDB DELETE FC 12
+0120 D4E6 DB 2C               FDB RENAME FC 13
+0121 D4E8 D6 99               FDB RESV2 FC 14
+0122 D4EA DA 87               FDB NXTSEC FC 15
+0123 D4EC D8 10               FDB OPNREC FC 16
+0124 D4EE D5 6F               FDB GETBYT FC 17
+0125 D4F0 D5 90               FDB PUTBYT FC 18
+0126 D4F2 DB 07               FDB RESV3 FC 19
+0127 D4F4 DD BD               FDB NXTDRV FC 20
+0128 D4F6 DC FB               FDB POSREC FC 21
+0129 D4F8 DC E5               FDB BAKREC FC 22
+0130                         *
+0131                         **
+0132                         *
+0133 D4FA 8D 20              ZD4FA BSR ZD51C
+0134 D4FC 26 05               BNE ZD503
+0135 D4FE C6 02               LDB #$02
+0136 D500 1A 01               ORCC #$01
+0137 D502 39                  RTS 
+0138                         
+0139 D503 ED 84              ZD503 STD ,X
+0140 D505 AE 84               LDX ,X
+0141 D507 6F 84               CLR ,X
+0142 D509 6F 01               CLR $01,X
+0143 D50B 39                  RTS 
+0144                         
+0145 D50C 8D 0E              ZD50C BSR ZD51C
+0146 D50E 27 05               BEQ ZD515
+0147 D510 C6 0D               LDB #$0D
+0148 D512 1A 01               ORCC #$01
+0149 D514 39                  RTS 
+0150                         
+0151 D515 EC 94              ZD515 LDD [,X]
+0152 D517 ED 84               STD ,X
+0153 D519 1C FE               ANDCC #$FE
+0154 D51B 39                  RTS 
+0155                         
+0156 D51C FC D4 0B           ZD51C LDD >CURFCB
+0157 D51F C3 00 1C            ADDD #$001C
+0158 D522 8E D4 09            LDX #FCBPTR
+0159 D525 10 AE 84           ZD525 LDY ,X
+0160 D528 26 03               BNE ZD52D
+0161 D52A 1C FB               ANDCC #$FB
+0162 D52C 39                  RTS 
+0163                         
+0164 D52D 10 A3 84           ZD52D CMPD ,X
+0165 D530 26 01               BNE ZD533
+0166 D532 39                  RTS 
+0167 D533 AE 84              ZD533 LDX ,X
+0168 D535 20 EE               BRA ZD525
+0169                         
+0170 D537 BE D4 0B           ZD537 LDX >CURFCB
+0171 D53A 4F                  CLRA 
+0172 D53B 5F                  CLRB 
+0173 D53C 8D 02               BSR ZD540
+0174 D53E C6 2F               LDB #$2F
+0175 D540 A7 88 11           ZD540 STA $11,X
+0176 D543 30 01               LEAX $01,X
+0177 D545 5A                  DECB 
+0178 D546 26 F8               BNE ZD540
+0179 D548 39                  RTS 
+0180                         
+0181 D549 BE D4 0B           ZD549 LDX >CURFCB
+0182 D54C C6 0B               LDB #$0B
+0183 D54E A6 04              ZD54E LDA $04,X
+0184 D550 A7 88 24            STA $24,X
+0185 D553 30 01               LEAX $01,X
+0186 D555 5A                  DECB 
+0187 D556 26 F6               BNE ZD54E
+0188 D558 39                  RTS 
+0189                         
+0190 D559 BE D4 0B           ZD559 LDX >CURFCB
+0191 D55C C6 0B               LDB #$0B
+0192 D55E A6 04              ZD55E LDA $04,X
+0193 D560 34 02               PSHS A
+0194 D562 A6 88 24            LDA $24,X
+0195 D565 A1 E0               CMPA ,S+
+0196 D567 26 05               BNE ZD56E
+0197 D569 30 01               LEAX $01,X
+0198 D56B 5A                  DECB 
+0199 D56C 26 F0               BNE ZD55E
+0200 D56E 39                 ZD56E RTS 
+0201                         *
+0202                         ** GET RANDOM BYTE FROM SECTOR
+0203                         *
+0204 D56F BE D4 0B           GETBYT LDX >CURFCB
+0205 D572 E6 02               LDB $02,X
+0206 D574 54                  LSRB 
+0207 D575 24 79               BCC ZD5F0
+0208 D577 E6 88 23            LDB $23,X
+0209 D57A 7E D6 00            JMP >ZD600
+0210                         
+0211 D57D BE D4 0B           ZD57D LDX >CURFCB
+0212 D580 E6 88 22            LDB $22,X
+0213 D583 6C 88 22            INC $22,X
+0214 D586 3A                  ABX 
+0215 D587 A7 88 40            STA $40,X
+0216 D58A 5C                  INCB 
+0217 D58B 26 1F               BNE ZD5AC
+0218 D58D 1A 01               ORCC #$01
+0219 D58F 39                  RTS 
+0220                         *
+0221                         ** PUT RANDOM BYTE IN SECTOR
+0222                         *
+0223 D590 BE D4 0B           PUTBYT LDX >CURFCB
+0224 D593 E6 02               LDB $02,X
+0225 D595 C4 03               ANDB #$03
+0226 D597 C1 03               CMPB #$03
+0227 D599 26 55               BNE ZD5F0
+0228 D59B CA 80               ORB #$80
+0229 D59D E7 02               STB $02,X
+0230 D59F E6 0F               LDB $0F,X
+0231 D5A1 C5 80               BITB #$80
+0232 D5A3 26 0A               BNE ZD5AF
+0233 D5A5 E6 88 23            LDB $23,X
+0234 D5A8 3A                  ABX 
+0235 D5A9 A7 88 40            STA $40,X
+0236 D5AC 1C FE              ZD5AC ANDCC #$FE
+0237 D5AE 39                  RTS 
+0238                         
+0239 D5AF C6 0B              ZD5AF LDB #$0B
+0240 D5B1 1A 01               ORCC #$01
+0241 D5B3 39                  RTS 
+0242                         
+0243 D5B4 A6 88 3B           ZD5B4 LDA $3B,X
+0244 D5B7 2B 3C               BMI ZD5F5
+0245 D5B9 27 07               BEQ ZD5C2
+0246 D5BB 6A 88 3B            DEC $3B,X
+0247 D5BE 86 20               LDA #$20
+0248 D5C0 20 1D               BRA ZD5DF
+0249                         
+0250 D5C2 8D 31              ZD5C2 BSR ZD5F5
+0251 D5C4 25 1B               BCS ZD5E1
+0252 D5C6 81 18               CMPA #$18
+0253 D5C8 22 15               BHI ZD5DF
+0254 D5CA 27 F6               BEQ ZD5C2
+0255 D5CC 81 09               CMPA #$09
+0256 D5CE 26 0C               BNE ZD5DC
+0257 D5D0 8D 23               BSR ZD5F5
+0258 D5D2 25 0D               BCS ZD5E1
+0259 D5D4 BE D4 0B            LDX >CURFCB
+0260 D5D7 A7 88 3B            STA $3B,X
+0261 D5DA 20 D8               BRA ZD5B4
+0262                         
+0263 D5DC 4D                 ZD5DC TSTA 
+0264 D5DD 27 E3               BEQ ZD5C2
+0265 D5DF 1C FE              ZD5DF ANDCC #$FE
+0266 D5E1 39                 ZD5E1 RTS 
+0267                         *
+0268                         ** REWIND FILE
+0269                         *
+0270 D5E2 BD DA B1           REWIND JSR >ZDAB1
+0271 D5E5 25 09               BCS ZD5F0
+0272 D5E7 85 01               BITA #$01
+0273 D5E9 27 05               BEQ ZD5F0
+0274 D5EB A7 84               STA ,X
+0275 D5ED 7E D9 A0            JMP >ZD9A0
+0276                         
+0277 D5F0 C6 12              ZD5F0 LDB #$12
+0278 D5F2 1A 01               ORCC #$01
+0279 D5F4 39                  RTS 
+0280                         
+0281 D5F5 BE D4 0B           ZD5F5 LDX >CURFCB
+0282 D5F8 E6 88 22            LDB $22,X
+0283 D5FB 27 0A               BEQ ZD607
+0284 D5FD 6C 88 22            INC $22,X
+0285 D600 3A                 ZD600 ABX 
+0286 D601 A6 88 40            LDA $40,X
+0287 D604 1C FE               ANDCC #$FE
+0288 D606 39                  RTS 
+0289                         
+0290 D607 8D 03              ZD607 BSR ZD60C
+0291 D609 24 EA               BCC ZD5F5
+0292 D60B 39                  RTS 
+0293                         
+0294 D60C BE D4 0B           ZD60C LDX >CURFCB
+0295 D60F EC 88 40            LDD $40,X
+0296 D612 6C 88 21            INC $21,X
+0297 D615 26 03               BNE ZD61A
+0298 D617 6C 88 20            INC $20,X
+0299 D61A 10 83 00 00        ZD61A CMPD #$0000
+0300 D61E 27 1C               BEQ ZD63C
+0301 D620 ED 88 1E           ZD620 STD $1E,X
+0302 D623 34 02               PSHS A
+0303 D625 86 04               LDA #$04
+0304 D627 A7 88 22            STA $22,X
+0305 D62A 35 02               PULS A
+0306 D62C 8D 13               BSR RDSECT
+0307 D62E 24 10               BCC ZD640
+0308 D630 C5 80               BITB #$80
+0309 D632 27 04               BEQ ZD638
+0310 D634 C6 10               LDB #$10
+0311 D636 20 06               BRA ZD63E
+0312                         
+0313 D638 C6 09              ZD638 LDB #$09
+0314 D63A 20 02               BRA ZD63E
+0315                         
+0316 D63C C6 08              ZD63C LDB #$08
+0317 D63E 1A 01              ZD63E ORCC #$01
+0318 D640 39                 ZD640 RTS 
+0319                         *
+0320                         ** READ SINGLE SECTOR
+0321                         *
+0322 D641 8D 25              RDSECT BSR ZD668
+0323 D643 BE D4 0B            LDX >CURFCB
+0324 D646 BD DE 0C            JSR >DRIVE
+0325 D649 25 12               BCS ZD65D
+0326 D64B 8D 11              ZD64B BSR ZD65E
+0327 D64D BD DE 00            JSR >READ
+0328 D650 26 03               BNE ZD655
+0329 D652 1C FE               ANDCC #$FE
+0330 D654 39                  RTS 
+0331                         
+0332 D655 34 04              ZD655 PSHS B
+0333 D657 8D 17               BSR ZD670
+0334 D659 35 04               PULS B
+0335 D65B 24 EE               BCC ZD64B
+0336 D65D 39                 ZD65D RTS 
+0337                         
+0338 D65E BE D4 0B           ZD65E LDX >CURFCB
+0339 D661 EC 88 1E            LDD $1E,X
+0340 D664 30 88 40            LEAX $40,X
+0341 D667 39                  RTS 
+0342                         
+0343 D668 4F                 ZD668 CLRA 
+0344 D669 B7 D4 11            STA >ZD411
+0345 D66C B7 D4 12            STA >ZD412
+0346 D66F 39                  RTS 
+0347                         
+0348 D670 C5 10              ZD670 BITB #$10
+0349 D672 26 11               BNE ZD685
+0350 D674 C5 80               BITB #$80
+0351 D676 26 24               BNE ZD69C
+0352 D678 F6 D4 11            LDB >ZD411
+0353 D67B 5C                  INCB 
+0354 D67C C1 07               CMPB #$07
+0355 D67E 27 05               BEQ ZD685
+0356 D680 F7 D4 11            STB >ZD411
+0357 D683 20 14               BRA RESV2
+0358                         
+0359 D685 7F D4 11           ZD685 CLR >ZD411
+0360 D688 F6 D4 12            LDB >ZD412
+0361 D68B 5C                  INCB 
+0362 D68C C1 04               CMPB #$04
+0363 D68E 27 0C               BEQ ZD69C
+0364 D690 F7 D4 12            STB >ZD412
+0365 D693 BE D4 0B            LDX >CURFCB
+0366 D696 BD DE 09            JSR >RESTOR
+0367                         *
+0368                         ** RESERVED
+0369                         *
+0370 D699 1C FE              RESV2 ANDCC #$FE
+0371 D69B 39                  RTS 
+0372 D69C 1A 01              ZD69C ORCC #$01
+0373 D69E 39                  RTS 
+0374                         *
+0375                         ** WRITE SINGLE SECTOR
+0376                         *
+0377 D69F 8D C7              WRSECT BSR ZD668
+0378 D6A1 BE D4 0B            LDX >CURFCB
+0379 D6A4 BD DE 0C            JSR >DRIVE
+0380 D6A7 25 20               BCS ZD6C9
+0381 D6A9 BE D4 0B           ZD6A9 LDX >CURFCB
+0382 D6AC 8D B0               BSR ZD65E
+0383 D6AE BD DE 03            JSR >WRITE
+0384 D6B1 26 0A               BNE ZD6BD
+0385 D6B3 B6 D4 35            LDA >VERFLG
+0386 D6B6 27 37               BEQ ZD6EF
+0387 D6B8 BD DE 06            JSR >VERIFY
+0388 D6BB 27 32               BEQ ZD6EF
+0389 D6BD C5 40              ZD6BD BITB #$40
+0390 D6BF 26 0B               BNE ZD6CC
+0391 D6C1 34 04               PSHS B
+0392 D6C3 8D AB               BSR ZD670
+0393 D6C5 35 04               PULS B
+0394 D6C7 24 E0               BCC ZD6A9
+0395 D6C9 39                 ZD6C9 RTS 
+0396                         
+0397 D6CA C6 20               LDB #$20
+0398 D6CC 1A 01              ZD6CC ORCC #$01
+0399 D6CE 39                  RTS 
+0400                         
+0401 D6CF BE D4 0B           ZD6CF LDX >CURFCB
+0402 D6D2 E6 88 3B            LDB $3B,X
+0403 D6D5 2B 3D               BMI ZD714
+0404 D6D7 81 20               CMPA #$20
+0405 D6D9 26 0F               BNE ZD6EA
+0406 D6DB 5C                  INCB 
+0407 D6DC E7 88 3B            STB $3B,X
+0408 D6DF C1 7F               CMPB #$7F
+0409 D6E1 26 0C               BNE ZD6EF
+0410 D6E3 20 0D               BRA ZD6F2
+0411                         
+0412 D6E5 8D 0B              ZD6E5 BSR ZD6F2
+0413 D6E7 24 E6               BCC ZD6CF
+0414 D6E9 39                  RTS 
+0415                         
+0416 D6EA 5D                 ZD6EA TSTB 
+0417 D6EB 27 27               BEQ ZD714
+0418 D6ED 20 F6               BRA ZD6E5
+0419                         
+0420 D6EF 1C FE              ZD6EF ANDCC #$FE
+0421 D6F1 39                  RTS 
+0422                         
+0423 D6F2 34 02              ZD6F2 PSHS A
+0424 D6F4 C1 01               CMPB #$01
+0425 D6F6 26 04               BNE ZD6FC
+0426 D6F8 86 20               LDA #$20
+0427 D6FA 20 10               BRA ZD70C
+0428                         
+0429 D6FC 86 09              ZD6FC LDA #$09
+0430 D6FE 8D 14               BSR ZD714
+0431 D700 35 02               PULS A
+0432 D702 25 0F               BCS ZD713
+0433 D704 34 02               PSHS A
+0434 D706 BE D4 0B            LDX >CURFCB
+0435 D709 A6 88 3B            LDA $3B,X
+0436 D70C 6F 88 3B           ZD70C CLR $3B,X
+0437 D70F 8D 03               BSR ZD714
+0438 D711 35 02               PULS A
+0439 D713 39                 ZD713 RTS 
+0440                         
+0441 D714 BE D4 0B           ZD714 LDX >CURFCB
+0442 D717 E6 02               LDB $02,X
+0443 D719 C1 02               CMPB #$02
+0444 D71B 10 26 FE D1         LBNE ZD5F0
+0445 D71F E6 88 22            LDB $22,X
+0446 D722 C1 04               CMPB #$04
+0447 D724 26 08               BNE ZD72E
+0448 D726 34 02               PSHS A
+0449 D728 8D 21               BSR ZD74B
+0450 D72A 35 02               PULS A
+0451 D72C 25 0F               BCS ZD73D
+0452 D72E BD D5 7D           ZD72E JSR >ZD57D
+0453 D731 24 0A               BCC ZD73D
+0454 D733 C6 04               LDB #$04
+0455 D735 BE D4 0B            LDX >CURFCB
+0456 D738 E7 88 22            STB $22,X
+0457 D73B 1C FE               ANDCC #$FE
+0458 D73D 39                 ZD73D RTS 
+0459                         
+0460 D73E BE D4 0B           ZD73E LDX >CURFCB
+0461 D741 4F                  CLRA 
+0462 D742 5F                  CLRB 
+0463 D743 ED 88 20            STD $20,X
+0464 D746 ED 88 42            STD $42,X
+0465 D749 20 27               BRA ZD772
+0466                         
+0467 D74B E6 88 12           ZD74B LDB $12,X
+0468 D74E 26 22               BNE ZD772
+0469 D750 E6 88 17            LDB $17,X
+0470 D753 27 44               BEQ ZD799
+0471 D755 6F 88 17            CLR $17,X
+0472 D758 8D 3F               BSR ZD799
+0473 D75A 25 2A               BCS ZD786
+0474 D75C 8D E0               BSR ZD73E
+0475 D75E 25 26               BCS ZD786
+0476 D760 8D DC               BSR ZD73E
+0477 D762 25 22               BCS ZD786
+0478 D764 BE D4 0B            LDX >CURFCB
+0479 D767 C6 02               LDB #$02
+0480 D769 E7 88 17            STB $17,X
+0481 D76C EC 88 11            LDD $11,X
+0482 D76F 7E DC 82            JMP >ZDC82
+0483                         
+0484 D772 8D 0E              ZD772 BSR ZD782
+0485 D774 BE D4 0B            LDX >CURFCB
+0486 D777 ED 88 40            STD $40,X
+0487 D77A BD D6 9F            JSR >WRSECT
+0488 D77D 24 1A               BCC ZD799
+0489 D77F 7E DB C1            JMP >ZDBC1
+0490                         
+0491 D782 8D 03              ZD782 BSR ZD787
+0492 D784 EC 84               LDD ,X
+0493 D786 39                 ZD786 RTS 
+0494                         
+0495 D787 BE D4 0B           ZD787 LDX >CURFCB
+0496 D78A E6 03               LDB $03,X
+0497 D78C 86 06               LDA #$06
+0498 D78E 3D                  MUL 
+0499 D78F 8E D4 1D            LDX #ZD41D
+0500 D792 3A                  ABX 
+0501 D793 BF D4 1B            STX >ZD41B
+0502 D796 6D 84               TST ,X
+0503 D798 39                  RTS 
+0504                         
+0505 D799 8D E7              ZD799 BSR ZD782
+0506 D79B 26 05               BNE ZD7A2
+0507 D79D C6 07               LDB #$07
+0508 D79F 1A 01              ZD79F ORCC #$01
+0509 D7A1 39                  RTS 
+0510                         
+0511 D7A2 BE D4 0B           ZD7A2 LDX >CURFCB
+0512 D7A5 ED 88 13            STD $13,X
+0513 D7A8 6D 88 12            TST $12,X
+0514 D7AB 26 03               BNE ZD7B0
+0515 D7AD ED 88 11            STD $11,X
+0516 D7B0 6C 88 16           ZD7B0 INC $16,X
+0517 D7B3 26 03               BNE ZD7B8
+0518 D7B5 6C 88 15            INC $15,X
+0519 D7B8 6D 88 17           ZD7B8 TST $17,X
+0520 D7BB 27 0B               BEQ ZD7C8
+0521 D7BD BD DC 43            JSR >ZDC43
+0522 D7C0 25 DD               BCS ZD79F
+0523 D7C2 BE D4 0B            LDX >CURFCB
+0524 D7C5 EC 88 13            LDD $13,X
+0525 D7C8 BD D6 20           ZD7C8 JSR >ZD620
+0526 D7CB 25 D2               BCS ZD79F
+0527 D7CD BE D4 0B            LDX >CURFCB
+0528 D7D0 EC 88 40            LDD $40,X
+0529 D7D3 34 06               PSHS B,A
+0530 D7D5 8D B0               BSR ZD787
+0531 D7D7 35 06               PULS B,A
+0532 D7D9 ED 84               STD ,X
+0533 D7DB 26 0A               BNE ZD7E7
+0534 D7DD 6F 02               CLR $02,X
+0535 D7DF 6F 03               CLR $03,X
+0536 D7E1 6F 04               CLR $04,X
+0537 D7E3 6F 05               CLR $05,X
+0538 D7E5 20 08               BRA ZD7EF
+0539                         
+0540 D7E7 10 AE 04           ZD7E7 LDY $04,X
+0541 D7EA 31 3F               LEAY -$01,Y
+0542 D7EC 10 AF 04            STY $04,X
+0543 D7EF 4F                 ZD7EF CLRA 
+0544 D7F0 BE D4 0B            LDX >CURFCB
+0545 D7F3 6C 88 21            INC $21,X
+0546 D7F6 26 03               BNE ZD7FB
+0547 D7F8 6C 88 20            INC $20,X
+0548 D7FB 5F                 ZD7FB CLRB 
+0549 D7FC A7 88 40           ZD7FC STA $40,X
+0550 D7FF 30 01               LEAX $01,X
+0551 D801 5A                  DECB 
+0552 D802 26 F8               BNE ZD7FC
+0553 D804 BE D4 0B            LDX >CURFCB
+0554 D807 EC 88 20            LDD $20,X
+0555 D80A ED 88 42            STD $42,X
+0556 D80D 1C FE               ANDCC #$FE
+0557 D80F 39                  RTS 
+0558                         *
+0559                         ** OPEN SYSTEM INFO. RECORD
+0560                         *
+0561 D810 5F                 OPNREC CLRB
+0562 D811 34 04               PSHS B
+0563 D813 C6 03               LDB #$03
+0564 D815 20 0E               BRA ZD825
+0565 D817 BE D4 15            LDX >ZD415
+0566 D81A BF D4 13            STX >ZD413
+0567 D81D F6 D4 13           OPNDIR LDB >ZD413
+0568 D820 34 04               PSHS B
+0569 D822 F6 D4 14            LDB >ZD414
+0570 D825 BE D4 0B           ZD825 LDX >CURFCB
+0571 D828 E7 88 41            STB $41,X
+0572 D82B 35 04               PULS B
+0573 D82D E7 88 40            STB $40,X
+0574 D830 7F D4 18            CLR >ZD418
+0575 D833 5F                  CLRB 
+0576 D834 E7 88 22            STB $22,X
+0577 D837 39                  RTS 
+0578                         *
+0579                         ** GET INFO RECORD
+0580                         *
+0581 D838 BE D4 0B           GETREC LDX >CURFCB
+0582 D83B E6 88 22            LDB $22,X
+0583 D83E 26 1D               BNE ZD85D
+0584 D840 BD D6 0C            JSR >ZD60C
+0585 D843 25 30               BCS ZD875
+0586 D845 BE D4 0B            LDX >CURFCB
+0587 D848 7D D4 18            TST >ZD418
+0588 D84B 26 05               BNE ZD852
+0589 D84D DC 44               LDD <Z0044
+0590 D84F FD D4 18            STD >ZD418
+0591 D852 86 10              ZD852 LDA #$10
+0592 D854 A7 88 22            STA $22,X
+0593 D857 EC 88 1E            LDD $1E,X
+0594 D85A ED 88 2F            STD $2F,X
+0595 D85D A6 88 22           ZD85D LDA $22,X
+0596 D860 A7 88 31            STA $31,X
+0597 D863 C6 18               LDB #$18
+0598 D865 34 14              ZD865 PSHS X,B
+0599 D867 BD D5 F5            JSR >ZD5F5
+0600 D86A 35 14               PULS X,B
+0601 D86C A7 04               STA $04,X
+0602 D86E 30 01               LEAX $01,X
+0603 D870 5A                  DECB 
+0604 D871 26 F2               BNE ZD865
+0605 D873 1C FE               ANDCC #$FE
+0606 D875 39                 ZD875 RTS 
+0607                         *
+0608                         ** PUT INFORMATION RECORD
+0609                         *
+0610 D876 BE D4 0B           PUTREC LDX >CURFCB
+0611 D879 A6 88 31            LDA $31,X
+0612 D87C A7 88 22            STA $22,X
+0613 D87F C6 18               LDB #$18
+0614 D881 34 14              ZD881 PSHS X,B
+0615 D883 A6 04               LDA $04,X
+0616 D885 BD D7 14            JSR >ZD714
+0617 D888 35 14               PULS X,B
+0618 D88A 30 01               LEAX $01,X
+0619 D88C 5A                  DECB 
+0620 D88D 26 F2               BNE ZD881
+0621 D88F 7E D6 9F            JMP >WRSECT
+0622                         
+0623 D892 BE D4 0B           ZD892 LDX >CURFCB
+0624 D895 A6 03               LDA $03,X
+0625 D897 A7 88 23            STA $23,X
+0626 D89A B6 D4 17            LDA >ZD417
+0627 D89D 7D D4 1A            TST >ZD41A
+0628 D8A0 26 31               BNE ZD8D3
+0629 D8A2 A7 03               STA $03,X
+0630 D8A4 BE D4 15            LDX >ZD415
+0631 D8A7 BF D4 13            STX >ZD413
+0632 D8AA 8C 00 05           ZD8AA CMPX #Z0005
+0633 D8AD 27 0C               BEQ ZD8BB
+0634 D8AF 8D 22               BSR ZD8D3
+0635 D8B1 23 37               BLS ZD8EA
+0636 D8B3 BE D4 18            LDX >ZD418
+0637 D8B6 BF D4 13            STX >ZD413
+0638 D8B9 20 EF               BRA ZD8AA
+0639                         
+0640 D8BB BE D4 0B           ZD8BB LDX >CURFCB
+0641 D8BE A6 88 23            LDA $23,X
+0642 D8C1 A7 03               STA $03,X
+0643 D8C3 2A 0E               BPL ZD8D3
+0644 D8C5 BD DD BD           ZD8C5 JSR >NXTDRV
+0645 D8C8 25 36               BCS ZD900
+0646 D8CA 8D 07               BSR ZD8D3
+0647 D8CC 23 1C               BLS ZD8EA
+0648 D8CE BD DD AD            JSR >ZDDAD
+0649 D8D1 20 F2               BRA ZD8C5
+0650                         
+0651 D8D3 BE D4 0B           ZD8D3 LDX >CURFCB
+0652 D8D6 7F D4 1A            CLR >ZD41A
+0653 D8D9 BD D5 49            JSR >ZD549
+0654 D8DC BD D8 1D            JSR >OPNDIR
+0655 D8DF BD D8 38           ZD8DF JSR >GETREC
+0656 D8E2 24 07               BCC ZD8EB
+0657 D8E4 C1 08               CMPB #$08
+0658 D8E6 27 18               BEQ ZD900
+0659 D8E8 1A 01               ORCC #$01
+0660 D8EA 39                 ZD8EA RTS 
+0661                         
+0662 D8EB BE D4 0B           ZD8EB LDX >CURFCB
+0663 D8EE A6 04               LDA $04,X
+0664 D8F0 27 0C               BEQ ZD8FE
+0665 D8F2 2A 02               BPL ZD8F6
+0666 D8F4 8D 0F               BSR ZD905
+0667 D8F6 BD D5 59           ZD8F6 JSR >ZD559
+0668 D8F9 26 E4               BNE ZD8DF
+0669 D8FB 1C FE               ANDCC #$FE
+0670 D8FD 39                  RTS 
+0671                         
+0672 D8FE 8D 05              ZD8FE BSR ZD905
+0673 D900 1C FB              ZD900 ANDCC #$FB
+0674 D902 1C FE               ANDCC #$FE
+0675 D904 39                  RTS 
+0676                         
+0677 D905 A6 88 33           ZD905 LDA $33,X
+0678 D908 26 0C               BNE ZD916
+0679 D90A EC 88 2F            LDD $2F,X
+0680 D90D ED 88 32            STD $32,X
+0681 D910 A6 88 31            LDA $31,X
+0682 D913 A7 88 34            STA $34,X
+0683 D916 39                 ZD916 RTS 
+0684                         
+0685 D917 BD D7 87           ZD917 JSR >ZD787
+0686 D91A 26 17               BNE ZD933
+0687 D91C 8D 18               BSR ZD936
+0688 D91E 25 15               BCS ZD935
+0689 D920 C6 06               LDB #$06
+0690 D922 10 BE D4 0B         LDY >CURFCB
+0691 D926 BE D4 1B            LDX >ZD41B
+0692 D929 A6 A8 5D           ZD929 LDA $5D,Y
+0693 D92C 31 21               LEAY $01,Y
+0694 D92E A7 80               STA ,X+
+0695 D930 5A                  DECB 
+0696 D931 26 F6               BNE ZD929
+0697 D933 1C FE              ZD933 ANDCC #$FE
+0698 D935 39                 ZD935 RTS 
+0699                         
+0700 D936 BD D8 10           ZD936 JSR >OPNREC
+0701 D939 BD D6 0C            JSR >ZD60C
+0702 D93C 25 08               BCS ZD946
+0703 D93E BE D4 0B            LDX >CURFCB
+0704 D941 C6 10               LDB #$10
+0705 D943 E7 88 22            STB $22,X
+0706 D946 39                 ZD946 RTS 
+0707                         
+0708 D947 BD D7 87           ZD947 JSR >ZD787
+0709 D94A 8D EA               BSR ZD936
+0710 D94C 25 F8               BCS ZD946
+0711 D94E C6 06               LDB #$06
+0712 D950 10 BE D4 0B         LDY >CURFCB
+0713 D954 BE D4 1B            LDX >ZD41B
+0714 D957 A6 80              ZD957 LDA ,X+
+0715 D959 A7 A8 5D            STA $5D,Y
+0716 D95C 31 21               LEAY $01,Y
+0717 D95E 5A                  DECB 
+0718 D95F 26 F6               BNE ZD957
+0719 D961 BD D6 9F            JSR >WRSECT
+0720 D964 24 E0               BCC ZD946
+0721 D966 7E DB C1            JMP >ZDBC1
+0722                         *
+0723                         **
+0724                         *
+0725 D969 BE D4 0B           RESV1 LDX >CURFCB
+0726 D96C 86 02               LDA #$02
+0727 D96E A7 02               STA $02,X
+0728 D970 EC 88 2F            LDD $2F,X
+0729 D973 ED 88 1E            STD $1E,X
+0730 D976 BD D6 41            JSR >RDSECT
+0731 D979 25 08               BCS ZD983
+0732 D97B BD D8 76            JSR >PUTREC
+0733 D97E 24 05               BCC ZD985
+0734 D980 7E DB C1            JMP >ZDBC1
+0735                         
+0736 D983 C6 0A              ZD983 LDB #$0A
+0737 D985 39                 ZD985 RTS 
+0738                         *
+0739                         ** OPEN FOR READ
+0740                         *
+0741 D986 BD D4 FA           OPENRD JSR >ZD4FA
+0742 D989 25 3D               BCS ZD9C8
+0743 D98B BD D8 92            JSR >ZD892
+0744 D98E 25 38               BCS ZD9C8
+0745 D990 26 3B               BNE ZD9CD
+0746 D992 BE D4 0B            LDX >CURFCB
+0747 D995 7D D4 1A            TST >ZD41A
+0748 D998 27 06               BEQ ZD9A0
+0749 D99A A6 0F               LDA $0F,X
+0750 D99C 85 20               BITA #$20
+0751 D99E 26 29               BNE ZD9C9
+0752 D9A0 BD DC C0           ZD9A0 JSR >ZDCC0
+0753 D9A3 25 2A               BCS ZD9CF
+0754 D9A5 EC 88 11            LDD $11,X
+0755 D9A8 ED 88 40            STD $40,X
+0756 D9AB BD DA 76            JSR >ZDA76
+0757 D9AE E6 88 17            LDB $17,X
+0758 D9B1 27 13               BEQ ZD9C6
+0759 D9B3 34 04              ZD9B3 PSHS B
+0760 D9B5 BD D6 0C            JSR >ZD60C
+0761 D9B8 35 04               PULS B
+0762 D9BA 25 0C               BCS ZD9C8
+0763 D9BC 5A                  DECB 
+0764 D9BD 26 F4               BNE ZD9B3
+0765 D9BF BE D4 0B            LDX >CURFCB
+0766 D9C2 5F                  CLRB 
+0767 D9C3 E7 88 22            STB $22,X
+0768 D9C6 1C FE              ZD9C6 ANDCC #$FE
+0769 D9C8 39                 ZD9C8 RTS 
+0770                         
+0771 D9C9 C6 11              ZD9C9 LDB #$11
+0772 D9CB 20 02               BRA ZD9CF
+0773                         
+0774 D9CD C6 04              ZD9CD LDB #$04
+0775 D9CF 34 04              ZD9CF PSHS B
+0776 D9D1 BD D5 0C            JSR >ZD50C
+0777 D9D4 35 04               PULS B
+0778 D9D6 1A 01               ORCC #$01
+0779 D9D8 39                  RTS 
+0780                         
+0781 D9D9 BE D4 0B           OPENWR LDX >CURFCB
+0782 D9DC 6D 03               TST $03,X
+0783 D9DE 2A 08               BPL ZD9E8
+0784 D9E0 BD DD BD            JSR >NXTDRV
+0785 D9E3 24 03               BCC ZD9E8
+0786 D9E5 C6 10               LDB #$10
+0787 D9E7 39                  RTS 
+0788                         
+0789 D9E8 BD D4 FA           ZD9E8 JSR >ZD4FA
+0790 D9EB 25 E2               BCS ZD9CF
+0791 D9ED BD D5 37            JSR >ZD537
+0792 D9F0 BD D9 17            JSR >ZD917
+0793 D9F3 25 DA               BCS ZD9CF
+0794 D9F5 BD D8 92            JSR >ZD892
+0795 D9F8 25 D5               BCS ZD9CF
+0796 D9FA 26 04               BNE ZDA00
+0797 D9FC C6 03               LDB #$03
+0798 D9FE 20 CF               BRA ZD9CF
+0799                         
+0800 DA00 BD DC C0           ZDA00 JSR >ZDCC0
+0801 DA03 25 CA               BCS ZD9CF
+0802 DA05 BE D4 0B            LDX >CURFCB
+0803 DA08 C6 0A               LDB #$0A
+0804 DA0A 6F 0F              ZDA0A CLR $0F,X
+0805 DA0C 30 01               LEAX $01,X
+0806 DA0E 5A                  DECB 
+0807 DA0F 26 F9               BNE ZDA0A
+0808 DA11 BE D4 0B            LDX >CURFCB
+0809 DA14 EC 88 32            LDD $32,X
+0810 DA17 27 27               BEQ ZDA40
+0811 DA19 ED 88 2F            STD $2F,X
+0812 DA1C A6 88 34            LDA $34,X
+0813 DA1F A7 88 31            STA $31,X
+0814 DA22 FC CC 0E            LDD >DATERG
+0815 DA25 ED 88 19            STD $19,X
+0816 DA28 B6 CC 10            LDA >YEAR
+0817 DA2B A7 88 1B            STA $1B,X
+0818 DA2E BD DD AD            JSR >ZDDAD
+0819 DA31 BD D9 69            JSR >RESV1
+0820 DA34 25 99               BCS ZD9CF
+0821 DA36 8D 3E               BSR ZDA76
+0822 DA38 86 04               LDA #$04
+0823 DA3A A7 88 22            STA $22,X
+0824 DA3D 1C FE               ANDCC #$FE
+0825 DA3F 39                  RTS 
+0826                         
+0827 DA40 BE D4 0B           ZDA40 LDX >CURFCB
+0828 DA43 6F 88 17            CLR $17,X
+0829 DA46 6C 88 12            INC $12,X
+0830 DA49 EC 88 2F            LDD $2F,X
+0831 DA4C BD D6 20            JSR >ZD620
+0832 DA4F 25 0D               BCS ZDA5E
+0833 DA51 BD D7 72            JSR >ZD772
+0834 DA54 25 08               BCS ZDA5E
+0835 DA56 BD D6 9F            JSR >WRSECT
+0836 DA59 24 06               BCC ZDA61
+0837 DA5B BD DB C1            JSR >ZDBC1
+0838 DA5E 7E D9 CF           ZDA5E JMP >ZD9CF
+0839                         
+0840 DA61 BE D4 0B           ZDA61 LDX >CURFCB
+0841 DA64 EC 88 1E            LDD $1E,X
+0842 DA67 ED 88 32            STD $32,X
+0843 DA6A 86 10               LDA #$10
+0844 DA6C A7 88 34            STA $34,X
+0845 DA6F BD D9 47            JSR >ZD947
+0846 DA72 25 EA               BCS ZDA5E
+0847 DA74 20 8A               BRA ZDA00
+0848                         
+0849 DA76 BE D4 0B           ZDA76 LDX >CURFCB
+0850 DA79 A6 84               LDA ,X
+0851 DA7B A7 02               STA $02,X
+0852 DA7D 6F 84               CLR ,X
+0853 DA7F 6F 88 3B            CLR $3B,X
+0854 DA82 4F                  CLRA 
+0855 DA83 A7 88 22            STA $22,X
+0856 DA86 39                  RTS 
+0857                         *
+0858                         ** READ/WRITE NEXT SECTOR
+0859                         *
+0860 DA87 8D 28              NXTSEC BSR ZDAB1
+0861 DA89 25 0E               BCS ZDA99
+0862 DA8B 6F 84               CLR ,X
+0863 DA8D 44                  LSRA 
+0864 DA8E 10 25 FB 7A         LBCS ZD60C
+0865 DA92 C6 04               LDB #$04
+0866 DA94 E7 88 22            STB $22,X
+0867 DA97 1C FE               ANDCC #$FE
+0868 DA99 39                 ZDA99 RTS 
+0869                         
+0870 DA9A BE D4 0B           ZDA9A LDX >CURFCB
+0871 DA9D A6 02               LDA $02,X
+0872 DA9F 81 83               CMPA #$83
+0873 DAA1 26 0B               BNE ZDAAE
+0874 DAA3 86 03               LDA #$03
+0875 DAA5 A7 02               STA $02,X
+0876 DAA7 BD D6 9F           ZDAA7 JSR >WRSECT
+0877 DAAA 10 25 01 13         LBCS ZDBC1
+0878 DAAE 1C FE              ZDAAE ANDCC #$FE
+0879 DAB0 39                  RTS 
+0880                         
+0881 DAB1 8D E7              ZDAB1 BSR ZDA9A
+0882 DAB3 25 0D               BCS ZDAC2
+0883 DAB5 BE D4 0B            LDX >CURFCB
+0884 DAB8 A6 02               LDA $02,X
+0885 DABA 81 03               CMPA #$03
+0886 DABC 23 F0               BLS ZDAAE
+0887 DABE C6 12               LDB #$12
+0888 DAC0 1A 01               ORCC #$01
+0889 DAC2 39                 ZDAC2 RTS 
+0890                         
+0891 DAC3 8D EC              CLOSE BSR ZDAB1
+0892 DAC5 25 31               BCS ZDAF8
+0893 DAC7 81 02               CMPA #$02
+0894 DAC9 27 08               BEQ ZDAD3
+0895 DACB BE D4 0B           ZDACB LDX >CURFCB
+0896 DACE 6F 02               CLR $02,X
+0897 DAD0 7E D5 0C            JMP >ZD50C
+0898                         
+0899 DAD3 A6 88 12           ZDAD3 LDA $12,X
+0900 DAD6 26 05               BNE ZDADD
+0901 DAD8 BD DB A7            JSR >ZDBA7
+0902 DADB 20 19               BRA ZDAF6
+0903                         
+0904 DADD 8D C8              ZDADD BSR ZDAA7
+0905 DADF 25 17               BCS ZDAF8
+0906 DAE1 BE D4 0B            LDX >CURFCB
+0907 DAE4 6D 88 17            TST $17,X
+0908 DAE7 27 05               BEQ ZDAEE
+0909 DAE9 BD DC 98            JSR >ZDC98
+0910 DAEC 25 0A               BCS ZDAF8
+0911 DAEE BD D9 69           ZDAEE JSR >RESV1
+0912 DAF1 25 05               BCS ZDAF8
+0913 DAF3 BD D9 47            JSR >ZD947
+0914 DAF6 24 D3              ZDAF6 BCC ZDACB
+0915 DAF8 39                 ZDAF8 RTS 
+0916                         *
+0917                         ** OPEN FOR UPDATE
+0918                         *
+0919 DAF9 BD D9 86           OPENUD JSR >OPENRD
+0920 DAFC 25 28               BCS ZDB26
+0921 DAFE BD D6 0C            JSR >ZD60C
+0922 DB01 25 23               BCS ZDB26
+0923 DB03 86 03               LDA #$03
+0924 DB05 20 18               BRA ZDB1F
+0925                         *
+0926                         **
+0927                         *
+0928 DB07 BD D9 86           RESV3 JSR >OPENRD
+0929 DB0A 25 1A               BCS ZDB26
+0930 DB0C BE D4 0B            LDX >CURFCB
+0931 DB0F A6 0F               LDA $0F,X
+0932 DB11 85 80               BITA #$80
+0933 DB13 26 12               BNE ZDB27
+0934 DB15 EC 88 13            LDD $13,X
+0935 DB18 BD D6 20            JSR >ZD620
+0936 DB1B 25 09               BCS ZDB26
+0937 DB1D 86 02               LDA #$02
+0938 DB1F BE D4 0B           ZDB1F LDX >CURFCB
+0939 DB22 A7 02               STA $02,X
+0940 DB24 1C FE               ANDCC #$FE
+0941 DB26 39                 ZDB26 RTS 
+0942                         
+0943 DB27 C6 0B              ZDB27 LDB #$0B
+0944 DB29 1A 01               ORCC #$01
+0945 DB2B 39                  RTS 
+0946                         *
+0947                         ** RENAME FILE
+0948                         *
+0949 DB2C 8D 35              RENAME BSR ZDB63
+0950 DB2E BD D8 92            JSR >ZD892
+0951 DB31 25 2A               BCS ZDB5D
+0952 DB33 27 24               BEQ ZDB59
+0953 DB35 BE D4 0B            LDX >CURFCB
+0954 DB38 C6 0B               LDB #$0B
+0955 DB3A A6 88 24           ZDB3A LDA $24,X
+0956 DB3D A7 04               STA $04,X
+0957 DB3F 30 01               LEAX $01,X
+0958 DB41 5A                  DECB 
+0959 DB42 26 F6               BNE ZDB3A
+0960 DB44 8D 4D               BSR ZDB93
+0961 DB46 25 15               BCS ZDB5D
+0962 DB48 BE D4 0B            LDX >CURFCB
+0963 DB4B A6 0F               LDA $0F,X
+0964 DB4D 85 80               BITA #$80
+0965 DB4F 26 D6               BNE ZDB27
+0966 DB51 85 60               BITA #$60
+0967 DB53 26 09               BNE ZDB5E
+0968 DB55 8D 0C               BSR ZDB63
+0969 DB57 20 55               BRA ZDBAE
+0970                         
+0971 DB59 C6 03              ZDB59 LDB #$03
+0972 DB5B 1A 01               ORCC #$01
+0973 DB5D 39                 ZDB5D RTS 
+0974 DB5E C6 0C              ZDB5E LDB #$0C
+0975 DB60 1A 01               ORCC #$01
+0976 DB62 39                  RTS 
+0977                         
+0978 DB63 BE D4 0B           ZDB63 LDX >CURFCB
+0979 DB66 86 0B               LDA #$0B
+0980 DB68 B7 D4 11            STA >ZD411
+0981 DB6B A6 04              ZDB6B LDA $04,X
+0982 DB6D E6 88 35            LDB $35,X
+0983 DB70 A7 88 35            STA $35,X
+0984 DB73 E7 04               STB $04,X
+0985 DB75 30 01               LEAX $01,X
+0986 DB77 7A D4 11            DEC >ZD411
+0987 DB7A 26 EF               BNE ZDB6B
+0988 DB7C BE D4 0B            LDX >CURFCB
+0989 DB7F A6 0C               LDA $0C,X
+0990 DB81 26 0C               BNE ZDB8F
+0991 DB83 C6 03               LDB #$03
+0992 DB85 A6 88 3D           ZDB85 LDA $3D,X
+0993 DB88 A7 0C               STA $0C,X
+0994 DB8A 30 01               LEAX $01,X
+0995 DB8C 5A                  DECB 
+0996 DB8D 26 F6               BNE ZDB85
+0997 DB8F BE D4 0B           ZDB8F LDX >CURFCB
+0998 DB92 39                  RTS 
+0999                         
+1000 DB93 8D CE              ZDB93 BSR ZDB63
+1001 DB95 BD D8 92           ZDB95 JSR >ZD892
+1002 DB98 25 07               BCS ZDBA1
+1003 DB9A 26 06               BNE ZDBA2
+1004 DB9C BE D4 0B            LDX >CURFCB
+1005 DB9F 1C FE               ANDCC #$FE
+1006 DBA1 39                 ZDBA1 RTS 
+1007                         
+1008 DBA2 C6 04              ZDBA2 LDB #$04
+1009 DBA4 1A 01               ORCC #$01
+1010 DBA6 39                  RTS 
+1011                         
+1012 DBA7 BE D4 0B           ZDBA7 LDX >CURFCB
+1013 DBAA 86 FF               LDA #$FF
+1014 DBAC A7 04               STA $04,X
+1015 DBAE BD D9 69           ZDBAE JSR >RESV1
+1016 DBB1 BE D4 0B            LDX >CURFCB
+1017 DBB4 86 00               LDA #$00
+1018 DBB6 A7 02               STA $02,X
+1019 DBB8 39                  RTS 
+1020                         
+1021 DBB9 ED 88 40           ZDBB9 STD $40,X
+1022 DBBC BD D6 9F            JSR >WRSECT
+1023 DBBF 24 14               BCC ZDBD5
+1024 DBC1 C5 40              ZDBC1 BITB #$40
+1025 DBC3 26 08               BNE ZDBCD
+1026 DBC5 C5 80               BITB #$80
+1027 DBC7 27 0A               BEQ ZDBD3
+1028 DBC9 C6 10               LDB #$10
+1029 DBCB 20 06               BRA ZDBD3
+1030 DBCD C6 0B              ZDBCD LDB #$0B
+1031 DBCF 20 02               BRA ZDBD3
+1032                         
+1033 DBD1 C6 0A               LDB #$0A
+1034 DBD3 1A 01              ZDBD3 ORCC #$01
+1035 DBD5 39                 ZDBD5 RTS 
+1036                         *
+1037                         ** DELETE FILE
+1038                         *
+1039 DBD6 BD D9 17           DELETE JSR >ZD917
+1040 DBD9 25 5E               BCS ZDC39
+1041 DBDB 8D B8               BSR ZDB95
+1042 DBDD 25 5A               BCS ZDC39
+1043 DBDF BE D4 0B            LDX >CURFCB
+1044 DBE2 A6 0F               LDA $0F,X
+1045 DBE4 85 80               BITA #$80
+1046 DBE6 26 52               BNE ZDC3A
+1047 DBE8 85 60               BITA #$60
+1048 DBEA 26 52               BNE ZDC3E
+1049 DBEC BD D7 87            JSR >ZD787
+1050 DBEF BE D4 1B            LDX >ZD41B
+1051 DBF2 EC 02               LDD $02,X
+1052 DBF4 26 0F               BNE ZDC05
+1053 DBF6 BE D4 0B            LDX >CURFCB
+1054 DBF9 EC 88 11            LDD $11,X
+1055 DBFC 27 33               BEQ ZDC31
+1056 DBFE BE D4 1B            LDX >ZD41B
+1057 DC01 ED 84               STD ,X
+1058 DC03 20 14               BRA ZDC19
+1059                         
+1060 DC05 BE D4 0B           ZDC05 LDX >CURFCB
+1061 DC08 BD D6 20            JSR >ZD620
+1062 DC0B 25 2C               BCS ZDC39
+1063 DC0D BE D4 0B            LDX >CURFCB
+1064 DC10 EC 88 11            LDD $11,X
+1065 DC13 27 1C               BEQ ZDC31
+1066 DC15 8D A2               BSR ZDBB9
+1067 DC17 25 20               BCS ZDC39
+1068 DC19 BE D4 0B           ZDC19 LDX >CURFCB
+1069 DC1C EC 88 13            LDD $13,X
+1070 DC1F BE D4 1B            LDX >ZD41B
+1071 DC22 ED 02               STD $02,X
+1072 DC24 BE D4 0B            LDX >CURFCB
+1073 DC27 EC 88 15            LDD $15,X
+1074 DC2A BE D4 1B            LDX >ZD41B
+1075 DC2D E3 04               ADDD $04,X
+1076 DC2F ED 04               STD $04,X
+1077 DC31 BD DB A7           ZDC31 JSR >ZDBA7
+1078 DC34 25 03               BCS ZDC39
+1079 DC36 BD D9 47            JSR >ZD947
+1080 DC39 39                 ZDC39 RTS 
+1081                         
+1082 DC3A C6 0B              ZDC3A LDB #$0B
+1083 DC3C 20 02               BRA ZDC40
+1084 DC3E C6 0C              ZDC3E LDB #$0C
+1085 DC40 1A 01              ZDC40 ORCC #$01
+1086 DC42 39                  RTS 
+1087                         
+1088 DC43 EC 88 1E           ZDC43 LDD $1E,X
+1089 DC46 5C                  INCB 
+1090 DC47 E1 88 3C            CMPB $3C,X
+1091 DC4A 23 03               BLS ZDC4F
+1092 DC4C C6 01               LDB #$01
+1093 DC4E 4C                  INCA 
+1094 DC4F 10 A3 88 13        ZDC4F CMPD $13,X
+1095 DC53 26 0E               BNE ZDC63
+1096 DC55 A6 88 37            LDA $37,X
+1097 DC58 81 FF               CMPA #$FF
+1098 DC5A 27 07               BEQ ZDC63
+1099 DC5C 4C                  INCA 
+1100 DC5D A7 88 37            STA $37,X
+1101 DC60 1C FE               ANDCC #$FE
+1102 DC62 39                  RTS 
+1103                         
+1104 DC63 8D 33              ZDC63 BSR ZDC98
+1105 DC65 25 30               BCS ZDC97
+1106 DC67 BE D4 0B            LDX >CURFCB
+1107 DC6A A6 88 3A            LDA $3A,X
+1108 DC6D 8B 03               ADDA #$03
+1109 DC6F 26 16               BNE ZDC87
+1110 DC71 EC 88 1E            LDD $1E,X
+1111 DC74 10 A3 88 11         CMPD $11,X
+1112 DC78 27 05               BEQ ZDC7F
+1113 DC7A C6 17               LDB #$17
+1114 DC7C 1A 01               ORCC #$01
+1115 DC7E 39                  RTS 
+1116                         
+1117 DC7F EC 88 40           ZDC7F LDD $40,X
+1118 DC82 ED 88 38           ZDC82 STD $38,X
+1119 DC85 86 04               LDA #$04
+1120 DC87 A7 88 3A           ZDC87 STA $3A,X
+1121 DC8A EC 88 13            LDD $13,X
+1122 DC8D ED 88 35            STD $35,X
+1123 DC90 86 01               LDA #$01
+1124 DC92 A7 88 37            STA $37,X
+1125 DC95 1C FE               ANDCC #$FE
+1126 DC97 39                 ZDC97 RTS 
+1127                         
+1128 DC98 EC 88 38           ZDC98 LDD $38,X
+1129 DC9B BD D6 20            JSR >ZD620
+1130 DC9E 25 F7               BCS ZDC97
+1131 DCA0 BE D4 0B            LDX >CURFCB
+1132 DCA3 1F 12               TFR X,Y
+1133 DCA5 E6 88 3A            LDB $3A,X
+1134 DCA8 3A                  ABX 
+1135 DCA9 C6 03               LDB #$03
+1136 DCAB A6 A8 35           ZDCAB LDA $35,Y
+1137 DCAE 31 21               LEAY $01,Y
+1138 DCB0 A7 88 40            STA $40,X
+1139 DCB3 30 01               LEAX $01,X
+1140 DCB5 5A                  DECB 
+1141 DCB6 26 F3               BNE ZDCAB
+1142 DCB8 BD D6 9F            JSR >WRSECT
+1143 DCBB 24 DA               BCC ZDC97
+1144 DCBD 7E DB C1            JMP >ZDBC1
+1145                         
+1146 DCC0 BD D8 10           ZDCC0 JSR >OPNREC
+1147 DCC3 BD D6 0C            JSR >ZD60C
+1148 DCC6 25 46               BCS ZDD0E
+1149 DCC8 BE D4 0B            LDX >CURFCB
+1150 DCCB 4F                  CLRA 
+1151 DCCC 5F                  CLRB 
+1152 DCCD ED 88 20            STD $20,X
+1153 DCD0 A6 88 67            LDA $67,X
+1154 DCD3 A7 88 3C            STA $3C,X
+1155 DCD6 5F                  CLRB 
+1156 DCD7 6F 88 40           ZDCD7 CLR $40,X
+1157 DCDA 30 01               LEAX $01,X
+1158 DCDC 5A                  DECB 
+1159 DCDD 26 F8               BNE ZDCD7
+1160 DCDF BE D4 0B            LDX >CURFCB
+1161 DCE2 1C FE               ANDCC #$FE
+1162 DCE4 39                  RTS 
+1163                         *
+1164                         ** BACKUP ONE RECORD
+1165                         *
+1166 DCE5 BE D4 0B           BAKREC LDX >CURFCB
+1167 DCE8 A6 88 17            LDA $17,X
+1168 DCEB 27 1D               BEQ ZDD0A
+1169 DCED EC 88 20            LDD $20,X
+1170 DCF0 83 00 01            SUBD #$0001
+1171 DCF3 2A 03               BPL ZDCF8
+1172 DCF5 7E DD 9A            JMP >ZDD9A
+1173                         *
+1174                         ** POSITION TO RECORD N
+1175                         *
+1176 DCF8 ED 88 20           ZDCF8 STD $20,X
+1177 DCFB BD DA B1           POSREC JSR >ZDAB1
+1178 DCFE 25 0E               BCS ZDD0E
+1179 DD00 46                  RORA 
+1180 DD01 24 07               BCC ZDD0A
+1181 DD03 6F 84               CLR ,X
+1182 DD05 A6 88 17            LDA $17,X
+1183 DD08 26 05               BNE ZDD0F
+1184 DD0A C6 12              ZDD0A LDB #$12
+1185 DD0C 1A 01               ORCC #$01
+1186 DD0E 39                 ZDD0E RTS 
+1187                         
+1188 DD0F 7F D4 11           ZDD0F CLR >ZD411
+1189 DD12 EC 88 11            LDD $11,X
+1190 DD15 10 AE 88 20         LDY $20,X
+1191 DD19 27 6A               BEQ ZDD85
+1192 DD1B BD DD 9F            JSR >ZDD9F
+1193 DD1E 25 EE               BCS ZDD0E
+1194 DD20 4F                  CLRA 
+1195 DD21 5F                  CLRB 
+1196 DD22 6D 02              ZDD22 TST $02,X
+1197 DD24 27 74               BEQ ZDD9A
+1198 DD26 EB 02               ADDB $02,X
+1199 DD28 89 00               ADCA #$00
+1200 DD2A BF D4 0F            STX >ZD40F
+1201 DD2D BE D4 0B            LDX >CURFCB
+1202 DD30 10 A3 88 20         CMPD $20,X
+1203 DD34 24 2C               BCC ZDD62
+1204 DD36 BE D4 0F            LDX >ZD40F
+1205 DD39 30 03               LEAX $03,X
+1206 DD3B 34 02               PSHS A
+1207 DD3D B6 D4 11            LDA >ZD411
+1208 DD40 4C                  INCA 
+1209 DD41 B7 D4 11            STA >ZD411
+1210 DD44 81 54               CMPA #$54
+1211 DD46 27 08               BEQ ZDD50
+1212 DD48 81 A8               CMPA #$A8
+1213 DD4A 35 02               PULS A
+1214 DD4C 27 4C               BEQ ZDD9A
+1215 DD4E 20 D2               BRA ZDD22
+1216                         
+1217 DD50 34 04              ZDD50 PSHS B
+1218 DD52 BE D4 0B            LDX >CURFCB
+1219 DD55 EC 88 40            LDD $40,X
+1220 DD58 8D 45               BSR ZDD9F
+1221 DD5A 25 3E               BCS ZDD9A
+1222 DD5C 35 04               PULS B
+1223 DD5E 35 02               PULS A
+1224 DD60 20 C0               BRA ZDD22
+1225                         
+1226 DD62 A3 88 20           ZDD62 SUBD $20,X
+1227 DD65 BE D4 0F            LDX >ZD40F
+1228 DD68 A6 02               LDA $02,X
+1229 DD6A 34 04               PSHS B
+1230 DD6C A0 E0               SUBA ,S+
+1231 DD6E 4A                  DECA 
+1232 DD6F 1F 89               TFR A,B
+1233 DD71 A6 84               LDA ,X
+1234 DD73 EB 01               ADDB $01,X
+1235 DD75 BE D4 0B            LDX >CURFCB
+1236 DD78 25 05               BCS ZDD7F
+1237 DD7A E1 88 3C           ZDD7A CMPB $3C,X
+1238 DD7D 23 06               BLS ZDD85
+1239 DD7F E0 88 3C           ZDD7F SUBB $3C,X
+1240 DD82 4C                  INCA 
+1241 DD83 20 F5               BRA ZDD7A
+1242                         
+1243 DD85 BD D6 20           ZDD85 JSR >ZD620
+1244 DD88 25 14               BCS ZDD9E
+1245 DD8A BE D4 0B            LDX >CURFCB
+1246 DD8D EC 88 42            LDD $42,X
+1247 DD90 10 A3 88 20         CMPD $20,X
+1248 DD94 27 14               BEQ ZDDAA
+1249 DD96 C6 19               LDB #$19
+1250 DD98 20 02               BRA ZDD9C
+1251                         
+1252 DD9A C6 18              ZDD9A LDB #$18
+1253 DD9C 1A 01              ZDD9C ORCC #$01
+1254 DD9E 39                 ZDD9E RTS 
+1255                         
+1256 DD9F BD D6 20           ZDD9F JSR >ZD620
+1257 DDA2 25 08               BCS ZDDAC
+1258 DDA4 BE D4 0B            LDX >CURFCB
+1259 DDA7 C6 44               LDB #$44
+1260 DDA9 3A                  ABX 
+1261 DDAA 1C FE              ZDDAA ANDCC #$FE
+1262 DDAC 39                 ZDDAC RTS 
+1263                         
+1264 DDAD BE D4 0B           ZDDAD LDX >CURFCB
+1265 DDB0 C6 0B               LDB #$0B
+1266 DDB2 A6 88 24           ZDDB2 LDA $24,X
+1267 DDB5 A7 04               STA $04,X
+1268 DDB7 30 01               LEAX $01,X
+1269 DDB9 5A                  DECB 
+1270 DDBA 26 F6               BNE ZDDB2
+1271 DDBC 39                  RTS 
+1272                         *
+1273                         ** FIND NEXT DRIVE
+1274                         *
+1275 DDBD BE D4 0B           NXTDRV LDX >CURFCB
+1276 DDC0 A6 03               LDA $03,X
+1277 DDC2 4C                  INCA 
+1278 DDC3 81 04               CMPA #$04
+1279 DDC5 24 0F               BCC ZDDD6
+1280 DDC7 A7 03               STA $03,X
+1281 DDC9 26 05               BNE ZDDD0
+1282 DDCB BD DE 0F            JSR >DRVRDY
+1283 DDCE 20 03               BRA ZDDD3
+1284                         
+1285 DDD0 BD DE 12           ZDDD0 JSR >QUICK
+1286 DDD3 25 E8              ZDDD3 BCS NXTDRV
+1287 DDD5 39                  RTS 
+1288                         
+1289 DDD6 C6 10              ZDDD6 LDB #$10
+1290 DDD8 1A 01               ORCC #$01
+1291 DDDA 39                  RTS 
+0011                          END
+0000                          INCLUDE "f9-monex.txt"
+0001                         *
+0002                         ** FLEX 9 DISK DRIVERS
+0003                         *
+0004                         * FOR SYS09BUG ON THE 
+0005                         * DIGILENT SPARTAN 3 STARTER BOARD AND
+0006                         * TERASIC CYCLONE 2 DE1 BOARD
+0007                         * WITH I/O MAPPED AT $XE000
+0008                         * AND ROM MAPPED AT $XF000
+0009                         * THE DIGILENT SPARTAN 3 STARTER BOARD HAS 1MBYTE OF SRAM
+0010                         * THE TERASIC CYCLONE 2 DE1 BOARD HAS 512KBYTE OF SRAM
+0011                         * THE FIRST 64K IS USED BY FLEX,
+0012                         * THE SECOND 128K IS USED AS A ROM DISK
+0013                         * THE REMAINING RAM IS USED FOR A RAM DISK
+0014                         *
+0015                         *
+0016 0001                    CFLAG   EQU $01     CARRY FLAG
+0017 0002                    VFLAG   EQU $02     OVERFLOW FLAG
+0018 0004                    ZFLAG   EQU $04     ZERO FLAG
+0019 0008                    NFLAG   EQU $08     NEGATIVE FLAG
+0020 0010                    IFLAG   EQU $10     IRQ MASK CC
+0021 0020                    HFLAG   EQU $20     HALF CARRY
+0022 0040                    FFLAG   EQU $40     FIRQ MASK CC
+0023 0080                    EFLAG   EQU $80     ENTIRE FLAG
+0024                         *
+0025 0000                    MAPPAG  EQU $00     PAGE $0000 DAT ADDRESS
+0026 FFF0                    DATREG  EQU IC11    DAT REGISTERS
+0027                         *
+0028                         * Serial Port
+0029                         *
+0030 E000                    ACIAC1  EQU ACIAS
+0031 E001                    ACIAD1  EQU ACIAS+1
+0032 04E2                    DELCON  EQU 1250    Delay (Processor clock in MHz * 50)
+0033                         *
+0034                         * XMODEM Control characters
+0035                         *
+0036 0001                    SOH     EQU $01
+0037 0004                    EOT     EQU $04
+0038 0006                    ACK     EQU $06
+0039 0015                    NAK     EQU $15
+0040 0018                    CAN     EQU $18
+0041                         *
+0042                         * DRIVE GEOMETRY
+0043                         *
+0044 000E                    EMAXSEC EQU 14     ROM DISK
+0045 0030                    EMAXTRK EQU 48     3  * 16 * 14 * 256 = 172,032 Bytes
+0046 0292                    ETOTSEC EQU EMAXTRK*EMAXSEC-EMAXSEC
+0047                         *
+0048 000E                    RMAXSEC EQU 14     RAM DISK
+0049                         *RMAXTRK EQU 192    12 * 16 * 14 * 256 = 688,128 Bytes Digilent Spartan 3
+0050 0040                    RMAXTRK EQU 64    4 * 16 * 14 * 256 = 229,376 Bytes Terasic Cyclone 2
+0051 0372                    RTOTSEC EQU RMAXTRK*RMAXSEC-RMAXSEC
+0052                         *
+0053                         * DRIVE TYPES
+0054                         *
+0055 0000                    DTYPROM EQU 0      ROM DISK
+0056 0001                    DTYPRAM EQU 1      RAM DISK
+0057 0002                    DTYPFLS EQU 2      FLASH DISK
+0058 0003                    DTYPNET EQU 3      FLEXNET DISK
+0059                         *
+0060 DE00                           ORG   $DE00
+0061                         *  
+0062                         * DISK DRIVER JUMP TABLE LAST UPDATE: 22/12/2006
+0063                         * Disk driver for RAM Disk.
+0064                         *
+0065                         * 14 SECTORS PER TRACK
+0066                         * 16 * N TRACKS PER DISK
+0067                         *
+0068                         * ROM DISK OCCUPIES $10000 - $1E000 ... $30000 - $3E000
+0069                         * RAM DISK OCCUPIES $40000 - $4E000 ... $F0000 - $FE000
+0070                         * Track Buffer page mapped at $E000 - $EFFF
+0071                         * MAPPAG = $00 = 0 x $1000 (4 K pages)
+0072                         
+0073                         * ON SWTPC ROM AT $XF000 AND IO AT $XE000
+0074                         * APPEARS THROUGHOUT THE MEMORY SO MUST BE SKIPPED OVER
+0075                         * WHEN USING RAM AS A RAMDISK.
+0076                         * THE MSN OF THE TRACK MAPS INTO THE MSN OF THE DAT
+0077                         * THE LSN OF THE TRACK NUMBER INDEXES INTO THE 4K RAM PAGE
+0078                         * THE SECTOR MAPS INTO THE LSN OF THE DAT WHICH IS INVERTED
+0079                         *
+0080                         *
+0081                         *
+0082                         * FLEX disk jump table.
+0083                         *
+0084 DE00 7E F0 57           READ   JMP   READSC
+0085 DE03 7E F0 5B           WRITE  JMP   WRITSC
+0086 DE06 7E F0 5F           VERIFY JMP   BUSY
+0087 DE09 7E F0 63           RESTOR JMP   RESTR1
+0088 DE0C 7E F0 6C           DRIVE  JMP   DRVSEL
+0089 DE0F 7E F0 9F           DRVRDY JMP   CHKRDY
+0090 DE12 7E F0 A3           QUICK  JMP   CHKQIK
+0091 DE15 7E F0 A7           COLDDR JMP   DINIT
+0092 DE18 7E F0 BF           WARMDR JMP   DWARM
+0093 DE1B 7E F0 C3           SEEK   JMP   SEEKTS
+0094                         *
+0095                         * RAM SPACE
+0096                         *
+0097 DE1E 00                 DRVNUM  FCB  0
+0098 DE1F 00                 TRACK   FCB  0
+0099 DE20 00                 SECTOR  FCB  0
+0100 DE21 00                 CHKSUM  FCB  0
+0101 DE22 00                 CCSAVE  FCB  0
+0102 DE23 00                 BLKNUM  FCB  0 Xmodem block number
+0103 DE24 00                 BYTCNT  FCB  0 Xmodem byte count
+0104 DE25 00 00              XSTATE  FDB  0 Xmodem State Vector
+0105 DE27 00 00 00           DELCNT  FCB  $00,$00,$00 Xmodem Poll timer
+0106                         *
+0107                         * Disc driver type table.
+0108                         * Indexed by drive number
+0109                         *
+0110 DE2A 00                 DTYPTAB FCB  DTYPROM Drive 0 (ROM Disk)
+0111 DE2B 01                         FCB  DTYPRAM Drive 1 (RAM Disk)
+0112 DE2C 02                         FCB  DTYPFLS Drive 2 (FLASH Disk)
+0113 DE2D 03                         FCB  DTYPNET Drive 3 (NETPC Disk)
+0114                         *
+0115                         * RAM Disk offset
+0116                         * Indexed by drive type
+0117                         *
+0118 DE2E 10                 DOFFTAB FCB  $10 ROM Disk $10000
+0119 DE2F 40                         FCB  $40 RAM DISK $40000
+0120 DE30 FF                         FCB  $FF Flash Disk
+0121 DE31 FF                         FCB  $FF NETPC Disk
+0122                         *
+0123 DE32                    REAVEC  RMB  2             Disc driver jump table.
+0124 DE34                    WRIVEC  RMB  2
+0125 DE36                    VERVEC  RMB  2
+0126 DE38                    RSTVEC  RMB  2
+0127 DE3A                    DRVVEC  RMB  2
+0128 DE3C                    CHKVEC  RMB  2
+0129 DE3E                    QUIVEC  RMB  2
+0130 DE40                    INIVEC  RMB  2
+0131 DE42                    WARVEC  RMB  2
+0132 DE44                    SEEVEC  RMB  2
+0133                         *
+0134                         * SECTOR BUFFER
+0135                         *
+0136 DE46                    BUFFER  RMB  256
+0137 DF46                    SYNCREG RMB  4      Prom input register
+0138                         *
+0139                         ****************************************
+0140                         *
+0141                         * START OF EXTENSION COMMANDS
+0142                         *
+0143                         ****************************************
+0144                         *
+0145 F000                            ORG MONEXT
+0146 F000 F7 BD                      FDB NEXTEXT   Jump to next extended command
+0147                         *
+0148                         *
+0149                         *****************************************
+0150                         * Disk drivers                          *
+0151                         * ------------                          *
+0152                         * The system dependant code for the     *
+0153                         * disc drivers fits here. Two tables    *
+0154                         * must be included. These are DTYPTAB a  *
+0155                         * four byte table that defines which of *
+0156                         * the (up to four) following sets of    *
+0157                         * jump tables to use, and TABSRT the    *
+0158                         * jump tables themselves. For a full    *
+0159                         * description of the floppy drivers see *
+0160                         * section 4 (pp9-14) of the general     *
+0161                         * Flex adaptation guide.                *
+0162                         *****************************************
+0163                         *
+0164                         * Mass storage drivers for embedded applications.
+0165                         *
+0166                         * Jump tables.
+0167 F002 F1 19              TABSRT  FDB EREAD Drive type 0 (ROM disk).
+0168 F004 F1 41                      FDB EWRITE
+0169 F006 F1 3F                      FDB ECHECK
+0170 F008 F1 3F                      FDB ECHECK
+0171 F00A F1 3F                      FDB ECHECK
+0172 F00C F1 3F                      FDB ECHECK
+0173 F00E F1 3F                      FDB ECHECK
+0174 F010 F0 52                      FDB DDUMMY
+0175 F012 F0 52                      FDB DDUMMY
+0176 F014 F0 52                      FDB DDUMMY
+0177                         *
+0178 F016 F1 19                      FDB EREAD Drive type 1 (RAM disk).
+0179 F018 F1 41                      FDB EWRITE
+0180 F01A F1 3F                      FDB ECHECK
+0181 F01C F1 3F                      FDB ECHECK
+0182 F01E F1 3F                      FDB ECHECK
+0183 F020 F1 3F                      FDB ECHECK
+0184 F022 F1 3F                      FDB ECHECK
+0185 F024 F0 52                      FDB DDUMMY
+0186 F026 F0 52                      FDB DDUMMY
+0187 F028 F0 52                      FDB DDUMMY
+0188                         *
+0189 F02A F0 52                      FDB DDUMMY Drive type 2 (External Flash disk).
+0190 F02C F0 52                      FDB DDUMMY
+0191 F02E F0 52                      FDB DDUMMY
+0192 F030 F0 52                      FDB DDUMMY
+0193 F032 F0 52                      FDB DDUMMY
+0194 F034 F0 52                      FDB DDUMMY
+0195 F036 F0 52                      FDB DDUMMY
+0196 F038 F0 52                      FDB DDUMMY
+0197 F03A F0 52                      FDB DDUMMY
+0198 F03C F0 52                      FDB DDUMMY
+0199                         *
+0200 F03E F1 7A                      FDB NREAD  Drive type 3 (NetPC drive via serial port).
+0201 F040 F1 E9                      FDB NWRITE
+0202 F042 F2 49                      FDB NVERIFY
+0203 F044 F2 4E                      FDB NCHECK
+0204 F046 F2 4E                      FDB NCHECK
+0205 F048 F2 4E                      FDB NCHECK
+0206 F04A F2 4E                      FDB NCHECK
+0207 F04C F0 52                      FDB DDUMMY
+0208 F04E F0 52                      FDB DDUMMY
+0209 F050 F0 52                      FDB DDUMMY
+0210                         *
+0211                         *
+0212                         * Dummy routine (no errors).
+0213 F052 5F                 DDUMMY  CLRB
+0214 F053 5D                         TSTB  Set (z)=1
+0215 F054 1C FE                      ANDCC  #$FF-CFLAG  Set (c)=0
+0216 F056 39                         RTS
+0217                         *               *
+0218                         **************************
+0219                         * Main Flex entry points *
+0220                         *************************
+0221                         *
+0222                         * Read sector routine.
+0223                         * Entry: (X) = address where sector is to be placed.
+0224                         *        (A) = Track  number.
+0225                         *        (B) = Sector number.
+0226                         * Exit:  (B) = Error code  (z)=1 if no error.
+0227 F057 6E 9F DE 32        READSC  JMP  [REAVEC]
+0228                         *
+0229                         * Write track routine.
+0230                         * Entry: (X) = Address of area of memory from which the data will be taken.
+0231                         *        (A) = Track number.
+0232                         *        (B) = Sector number.
+0233                         * Exit:  (B) = Error condition, (Z)=1 no an error.
+0234 F05B 6E 9F DE 34        WRITSC  JMP  [WRIVEC]
+0235                         *
+0236                         * Verify sector routine.
+0237                         * Entry: no parameters.
+0238                         * Exit:  (B) = Error condition (Z)=1 if no error.
+0239 F05F 6E 9F DE 36        BUSY  JMP  [VERVEC]
+0240                         *
+0241                         * Restore drive to track 00.
+0242                         * Entry: (X) = FCB address (3,X contains drive number).
+0243                         * Exit:  (B) = Error condition, (Z)=1 if no error.
+0244 F063 8D 07              RESTR1  BSR  DRVSEL Select drive first.
+0245 F065 27 01                      BEQ  RST1
+0246 F067 39                         RTS
+0247 F068 6E 9F DE 38        RST1    JMP  [RSTVEC]
+0248                         *
+0249                         * Select current drive.
+0250                         * Entry: (X) = FCB address (3,X contains drive number).
+0251                         * Exit:  (B) = Error condition, (Z)=0 and (c)=1 if error.
+0252                         *        (B) = $0F if non existant drive.
+0253 F06C 34 30              DRVSEL  PSHS  X,Y
+0254 F06E E6 03                      LDB  3,X  Get driver type.
+0255 F070 F7 DE 1E                   STB  DRVNUM
+0256 F073 8E DE 2A                   LDX  #DTYPTAB
+0257 F076 A6 85                      LDA  B,X
+0258 F078 81 FF                      CMPA  #$FF  Is the drive nonexistant?
+0259 F07A 26 08                      BNE  DRIVE1
+0260 F07C 35 30                      PULS  X,Y
+0261 F07E C6 0F                      LDB  #$0F
+0262 F080 5D                         TSTB
+0263 F081 1A 01                      ORCC  #$01
+0264 F083 39                         RTS
+0265                         *
+0266 F084 C6 14              DRIVE1  LDB  #20  Get correct table start address.
+0267 F086 3D                         MUL
+0268 F087 8E F0 02                   LDX  #TABSRT
+0269 F08A 30 8B                      LEAX  D,X
+0270 F08C 10 8E DE 32                LDY  #REAVEC Copy table into ram.
+0271 F090 C6 14                      LDB  #20
+0272 F092 A6 80              DRIVE2  LDA  0,X+
+0273 F094 A7 A0                      STA  0,Y+
+0274 F096 5A                         DECB
+0275 F097 26 F9                      BNE  DRIVE2
+0276 F099 35 30                      PULS X,Y
+0277 F09B 6E 9F DE 3A                JMP  [DRVVEC]
+0278                         *
+0279                         * Check for drive ready.
+0280                         * Entry: (X) = FCB address (3,X contains drive number)>
+0281                         * Exit:  (B) = Error condition, (Z)=0 AND (C)=1 if drive is not ready.
+0282 F09F 6E 9F DE 3C        CHKRDY  JMP  [CHKVEC]
+0283                         *
+0284                         * Quick drive ready check.
+0285                         * Entry: (X) = FCB address (3,X contains drive number).
+0286                         * Exit:  (B) = Error condition, (Z)=0 AND (c)=1 if drive not ready.
+0287 F0A3 6E 9F DE 3E        CHKQIK  JMP  [QUIVEC]
+0288                         *
+0289                         * Init (cold start).
+0290                         * Entry: no parameters.
+0291                         * Exit: no change.
+0292 F0A7 4F                 DINIT   CLRA
+0293 F0A8 B7 DE 1E           DINIT1  STA  DRVNUM  Init each valid drive in turn.
+0294 F0AB 8E DE 1B                   LDX  #DRVNUM-3
+0295 F0AE 8D BC                      BSR  DRVSEL
+0296 F0B0 25 04                      BCS  DINIT2
+0297 F0B2 AD 9F DE 40                JSR  [INIVEC]
+0298 F0B6 B6 DE 1E           DINIT2  LDA  DRVNUM
+0299 F0B9 4C                         INCA
+0300 F0BA 81 04                      CMPA  #4
+0301 F0BC 26 EA                      BNE  DINIT1
+0302 F0BE 39                         RTS
+0303                         *
+0304                         * Warm start.
+0305                         * Entry: no parameters.
+0306                         * Exit: no change.
+0307 F0BF 6E 9F DE 42        DWARM    JMP  [WARVEC]
+0308                         *
+0309                         * Seek track.
+0310                         * Entry: (A) = Track number.
+0311                         *        (B) = Sector number.
+0312                         * Exit:  (B) = Error condition, (Z)=1 if no error.
+0313 F0C3 6E 9F DE 44        SEEKTS  JMP  [SEEVEC]
+0314                         *
+0315                         *
+0316                         *****************************************************
+0317                         * ROMdisk drivers                                   *
+0318                         * ---------------                                   *
+0319                         * Drivers to support a ROMdisk in the external RAM  *
+0320                         * of the SYS09. The ROMdisk base address is $10000   *
+0321                         *****************************************************
+0322                         * Dummy return for ROM disk (write protected!)
+0323                         *
+0324                         * MAP RAM DISK INTO MEMORY SPACE
+0325                         *
+0326 F0C7 1F A8              MAPIN   TFR   CC,A     ; Save state of interrupt masks
+0327 F0C9 B7 DE 22                   STA   CCSAVE
+0328 F0CC 1A 50                      ORCC  #FFLAG+IFLAG ; Mask interrupts while IO mapped out
+0329 F0CE CE DE 2A                   LDU   #DTYPTAB  ; Point to Drive Type table
+0330 F0D1 F6 DE 1E                   LDB   DRVNUM   ; Get working drive number
+0331 F0D4 E6 C5                      LDB   B,U
+0332 F0D6 CE DE 2E                   LDU   #DOFFTAB
+0333 F0D9 B6 DE 1F                   LDA   TRACK
+0334 F0DC AB C5                      ADDA  B,U      ; Add Base offset into RAM
+0335 F0DE 84 F0                      ANDA  #$F0     ; Mask MSN
+0336 F0E0 A7 E2                      STA   ,-S      ; Save A on stack
+0337                         * 
+0338 F0E2 B6 DE 20                   LDA   SECTOR
+0339 F0E5 80 01                      SUBA  #1       ; Sectors 1 to 14 => 0 to 13
+0340 F0E7 88 0F                      EORA  #$0F     ; Complement LSNybble
+0341 F0E9 84 0F                      ANDA  #$0F
+0342                         *
+0343 F0EB AB E0                      ADDA  ,S+       ; Add sector to LSN of Track and pop
+0344 F0ED B7 FF F0                   STA   DATREG+MAPPAG
+0345                         *
+0346 F0F0 B6 DE 1F                   LDA   TRACK   ; LSN of Track indexes into 4K page
+0347 F0F3 84 0F                      ANDA  #$0F
+0348 F0F5 8B 00                      ADDA  #MAPPAG*16
+0349 F0F7 5F                         CLRB
+0350 F0F8 1F 03                      TFR   D,U
+0351 F0FA 39                         RTS
+0352                         *
+0353                         * MAP RAM DISK OUT OF MEMORY
+0354                         *
+0355 F0FB 86 00              MAPOUT  LDA   #MAPPAG  ; Point to the Flex page
+0356 F0FD 88 0F                      EORA  #$0F     ; Complement LSNybble
+0357 F0FF B7 FF F0                   STA   DATREG+MAPPAG ; map in Flex page
+0358 F102 B6 DE 22                   LDA   CCSAVE   ; restore interrupt masks
+0359 F105 1F 8A                      TFR   A,CC
+0360 F107 39                         RTS
+0361                         *
+0362                         * Seek track and sector
+0363                         * A holds track number (0-32)
+0364                         * B holds sector number (1-14)
+0365                         *
+0366 F108 B7 DE 1F           ESEEK   STA   TRACK
+0367 F10B F7 DE 20                   STB   SECTOR
+0368 F10E 1C FE                      ANDCC #$FE   ; CLEAR CARRY
+0369 F110 1A 04                      ORCC  #$04   ; SET Z
+0370 F112 39                         RTS
+0371                         *
+0372                         * MARK DISK READ ONLY
+0373                         *
+0374 F113 C6 40              EDUMMY  LDB  #$40
+0375 F115 5D                         TSTB
+0376 F116 1A 01                      ORCC  #$01
+0377 F118 39                         RTS
+0378                         *
+0379 F119 34 70              EREAD   PSHS X,Y,U push sequentialy to preserve order on stack
+0380 F11B 17 FF EA                   LBSR ESEEK
+0381 F11E 17 FF A6                   LBSR MAPIN build external ram address
+0382                         *
+0383 F121 10 8E DE 46                LDY #BUFFER
+0384 F125 5F                         CLRB
+0385 F126 A6 C0              ERLOOP1 LDA 0,U+ move 256 bytes to buffer from external RAM
+0386 F128 A7 A0                      STA 0,Y+
+0387 F12A 5A                         DECB
+0388 F12B 26 F9                      BNE ERLOOP1
+0389                         *
+0390 F12D 17 FF CB                   LBSR MAPOUT
+0391                         *
+0392 F130 10 8E DE 46                LDY #BUFFER
+0393 F134 5F                         CLRB
+0394 F135 A6 A0              ERLOOP2 LDA 0,Y+ move 256 bytes from buffer to Flex RAM
+0395 F137 A7 80                      STA 0,X+
+0396 F139 5A                         DECB
+0397 F13A 26 F9                      BNE ERLOOP2
+0398                         *
+0399 F13C 5F                         CLRB
+0400 F13D 35 F0                      PULS X,Y,U,PC  restore all registers
+0401                         *
+0402                         * check for marker bytes $AA55 in first bytes of first track/sector
+0403                         *
+0404                         *ECHECK  CLRA 
+0405                         *        LDB  #1
+0406                         *        LDX  #BUFFER
+0407                         *        BSR  EREAD
+0408                         *        LDD  BUFFER
+0409                         *        CMPD  #$AA55
+0410                         *        BNE  EERR
+0411                         *        LBRA  DDUMMY
+0412                         *EERR    LDB  #$80 not ready bit set
+0413                         *        TSTB
+0414                         *        ORCC  #$01
+0415                         *        RTS
+0416 F13F 5F                 ECHECK CLRB
+0417 F140 39                        RTS
+0418                         *
+0419                         * Write Sector
+0420                         *
+0421 F141 34 70              EWRITE  PSHS X,Y,U
+0422 F143 17 FF C2                   LBSR ESEEK
+0423 F146 CE DE 2A                   LDU  #DTYPTAB  ; Point to Drive Type table
+0424 F149 F6 DE 1E                   LDB  DRVNUM    ; Get working drive number
+0425 F14C E6 C5                      LDB  B,U       ; Fetch Drive type
+0426 F14E C1 01                      CMPB #DTYPRAM  ; Is it a RAM Disk ?
+0427 F150 27 07                      BEQ  EWOK      ; Yep, can write to it
+0428 F152 C1 00                      CMPB #DTYPROM  ; Allow writes to ROM Disk too
+0429 F154 27 03                      BEQ  EWOK
+0430 F156 16 FF BA                   LBRA EDUMMY    ; Nope report read only 
+0431                         *
+0432 F159 10 8E DE 46        EWOK    LDY #BUFFER
+0433 F15D 5F                         CLRB
+0434 F15E A6 80              EWLOOP1 LDA 0,X+ move 256 bytes to buffer from Flex RAM
+0435 F160 A7 A0                      STA 0,Y+
+0436 F162 5A                         DECB
+0437 F163 26 F9                      BNE EWLOOP1
+0438                         *
+0439 F165 17 FF 5F                   LBSR MAPIN
+0440                         *
+0441 F168 10 8E DE 46                LDY #BUFFER
+0442 F16C 5F                         CLRB
+0443 F16D A6 A0              EWLOOP2 LDA 0,Y+ move 256 bytes from buffer to external RAM
+0444 F16F A7 C0                      STA 0,U+
+0445 F171 5A                         DECB
+0446 F172 26 F9                      BNE EWLOOP2
+0447                         *
+0448 F174 17 FF 84                   LBSR MAPOUT
+0449                         *
+0450 F177 5F                 	CLRB
+0451 F178 35 F0                      PULS X,Y,U,PC
+0452                         *
+0453                         *
+0454                         *****************************************************
+0455                         * FlexNet drivers                                   *
+0456                         * ---------------                                   *
+0457                         * Drivers to support a remote connection via the    *
+0458                         * serial port using the FlexNet protocol as defined *
+0459                         * in FLEXNet_421B                                   *
+0460                         *****************************************************
+0461                         *
+0462                         *
+0463                         * read sector from remote drive
+0464                         *
+0465 F17A 34 04              NREAD   PSHS    B
+0466 F17C 34 02                      PSHS    A
+0467 F17E 7F DE 21                   CLR     CHKSUM          clear checksum
+0468 F181 7F DE 22                   CLR     CHKSUM+1
+0469                         *	
+0470 F184 86 73                      LDA     #'s             Send read sector command
+0471 F186 BD F2 85                   JSR     SCHAR
+0472 F189 24 4C                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0473                         *
+0474 F18B B6 DE 1E                   LDA     DRVNUM           send drive
+0475 F18E BD F2 85                   JSR     SCHAR
+0476 F191 24 44                      BCC     NRD_DNR           
+0477                         *
+0478 F193 35 02                      PULS    A               send track
+0479 F195 BD F2 85                   JSR     SCHAR
+0480 F198 24 3D                      BCC     NRD_DNR          
+0481                         *
+0482 F19A 35 02                      PULS    A               send sector
+0483 F19C BD F2 85                   JSR     SCHAR
+0484 F19F 24 36                      BCC     NRD_DNR          
+0485                         *
+0486                         * transfer 256 bytes
+0487 F1A1 5F                         CLRB                    
+0488 F1A2 BD F2 67           NREAD1  JSR     RCHAR           read byte
+0489 F1A5 24 30                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0490 F1A7 A7 80                      STA     0,X+
+0491 F1A9 BB DE 22                   ADDA    CHKSUM+1        update checksum
+0492 F1AC B7 DE 22                   STA     CHKSUM+1
+0493 F1AF 24 03                      BCC     NREAD2         
+0494 F1B1 7C DE 21                   INC     CHKSUM
+0495 F1B4 5A                 NREAD2  DECB         
+0496 F1B5 26 EB                      BNE     NREAD1          
+0497                         *
+0498                         * compare checksums
+0499 F1B7 BD F2 67                   JSR     RCHAR           get checksum msb
+0500 F1BA 24 1B                      BCC     NRD_DNR
+0501 F1BC 34 02                      PSHS    A
+0502 F1BE BD F2 67                   JSR     RCHAR           get checksum lsb
+0503 F1C1 24 14                      BCC     NRD_DNR
+0504 F1C3 1F 89                      TFR     A,B            
+0505 F1C5 35 02                      PULS    A               
+0506 F1C7 10 B3 DE 21                CMPD    CHKSUM          compare checksums
+0507 F1CB 26 0E                      BNE     NRD_ERR         if checksum error, then flag crc read error
+0508                         *
+0509 F1CD 86 06                      LDA     #ACK            no checksum error, send ACK char
+0510 F1CF BD F2 85                   JSR     SCHAR
+0511 F1D2 24 03                      BCC     NRD_DNR 
+0512 F1D4 5F                         CLRB                    all OK, flag no error
+0513 F1D5 20 0D                      BRA     NRD_END
+0514                         *
+0515 F1D7 C6 10              NRD_DNR LDB     #16             flag drive not ready
+0516 F1D9 20 09                      BRA     NRD_END
+0517                         *
+0518 F1DB 86 15              NRD_ERR LDA     #NAK            send NAK
+0519 F1DD BD F2 85                   JSR     SCHAR
+0520 F1E0 24 F5                      BCC     NRD_DNR  
+0521 F1E2 C6 09                      LDB     #09             flag crc read error
+0522                         *
+0523 F1E4 F7 DE 21           NRD_END STB     CHKSUM          used by VERIFY
+0524 F1E7 5D                         TSTB                    
+0525 F1E8 39                         RTS
+0526                         *
+0527                         *
+0528                         * write sector to remote drive
+0529                         *
+0530 F1E9 34 04              NWRITE  PSHS B
+0531 F1EB 34 02                      PSHS A
+0532 F1ED 7F DE 21                   CLR     CHKSUM          clear checksum
+0533 F1F0 7F DE 22                   CLR     CHKSUM+1
+0534                         *	
+0535 F1F3 86 72                      LDA     #'r             Send write sector command
+0536 F1F5 BD F2 85                   JSR     SCHAR
+0537 F1F8 24 DD                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0538                         *
+0539 F1FA B6 DE 1E                   LDA     DRVNUM           send drive
+0540 F1FD BD F2 85                   JSR     SCHAR
+0541 F200 24 D5                      BCC     NRD_DNR           
+0542                         *
+0543 F202 35 02                      PULS    A               send track
+0544 F204 BD F2 85                   JSR     SCHAR
+0545 F207 24 CE                      BCC     NRD_DNR          
+0546                         *
+0547 F209 35 02                      PULS    A               send sector
+0548 F20B BD F2 85                   JSR     SCHAR
+0549 F20E 24 C7                      BCC     NRD_DNR          
+0550                         *
+0551                         * transfer 256 bytes
+0552 F210 5F                         CLRB                    
+0553 F211 A6 80              NWRITE1 LDA     0,X+
+0554 F213 BD F2 85                   JSR     SCHAR           write byte
+0555 F216 24 BF                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0556 F218 BB DE 22                   ADDA    CHKSUM+1        update checksum
+0557 F21B B7 DE 22                   STA     CHKSUM+1
+0558 F21E 24 03                      BCC     NWRITE2         
+0559 F220 7C DE 21                   INC     CHKSUM
+0560 F223 5A                 NWRITE2 DECB         
+0561 F224 26 EB                      BNE     NWRITE1          
+0562                         *
+0563                         * compare checksums
+0564 F226 B6 DE 21                   LDA     CHKSUM
+0565 F229 BD F2 85                   JSR     SCHAR           send checksum msb
+0566 F22C 24 A9                      BCC     NRD_DNR
+0567 F22E B6 DE 22                   LDA     CHKSUM+1
+0568 F231 BD F2 85                   JSR     SCHAR           send checksum lsb
+0569 F234 24 A1                      BCC     NRD_DNR
+0570                         *
+0571 F236 BD F2 67                   JSR     RCHAR           get checksum response
+0572 F239 24 9C                      BCC     NRD_DNR        
+0573 F23B 81 06                      CMPA    #ACK
+0574 F23D 26 03                      BNE     NWR_ERR         if checksum error, then flag write error    
+0575                         *
+0576 F23F 5F                         CLRB                    all OK, flag no error
+0577 F240 20 02                      BRA     NWR_END
+0578                         *
+0579 F242 C6 0A              NWR_ERR LDB     #10             flag write error
+0580                         *
+0581 F244 F7 DE 21           NWR_END STB     CHKSUM          used by VERIFY
+0582 F247 5D                         TSTB                    
+0583 F248 39                         RTS
+0584                         *
+0585                         *
+0586                         *   verify last sector written to remote drive
+0587                         *
+0588 F249 F6 DE 21           NVERIFY LDB     CHKSUM         test last checksum
+0589 F24C 5D                         TSTB
+0590 F24D 39                         RTS
+0591                         *
+0592                         *
+0593                         *   quck check and check drive ready
+0594                         *
+0595 F24E 86 51              NCHECK  LDA     #'Q             quick check command
+0596 F250 BD F2 85                   JSR     SCHAR
+0597 F253 24 0C                      BCC     NCK_ERR         if timeout, then flag drive not ready
+0598                         
+0599 F255 BD F2 67                   JSR     RCHAR           get response from host
+0600 F258 24 07                      BCC     NCK_ERR
+0601 F25A 81 06                      CMPA    #ACK
+0602 F25C 26 03                      BNE     NCK_ERR         if NAK, then flag drive not ready
+0603                         
+0604 F25E 5F                         CLRB                    all OK, flag drive ready
+0605 F25F 20 04                      BRA     NCK_END
+0606                         *
+0607 F261 C6 10              NCK_ERR LDB     #16             report drive not ready
+0608 F263 1A 01                      ORCC    #$01            check needs carry set as well
+0609                         *
+0610 F265 5D                 NCK_END TSTB
+0611 F266 39                         RTS
+0612                         *
+0613                         *
+0614                         * recieve char from remote drive.
+0615                         * timeout if no response for approx 1s.
+0616                         * Entry: no parameters
+0617                         * Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+0618                         *
+0619 F267 34 30              RCHAR   PSHS    X,Y
+0620                         *
+0621 F269 8E 03 E8                   LDX     #1000         1000x inner loop
+0622 F26C 10 8E 04 E2        RCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+0623 F270 B6 E0 00           RCHAR2  LDA     ACIAC1        test for recieved char
+0624 F273 47                         ASRA
+0625 F274 25 0A                      BCS     RCHAR3        get character
+0626 F276 31 3F                      LEAY    -1,Y          else, continue to count delay
+0627 F278 26 F6                      BNE     RCHAR2
+0628 F27A 30 1F                      LEAX    -1,X
+0629 F27C 26 EE                      BNE     RCHAR1
+0630 F27E 35 B0                      PULS    X,Y,PC        return with error if timed out
+0631                         *
+0632 F280 B6 E0 01           RCHAR3  LDA     ACIAD1        return data (carry bit still set)
+0633 F283 35 B0                      PULS    X,Y,PC
+0634                         *
+0635                         *
+0636                         * transmit char to remote drive.
+0637                         * timeout if no response for approx 1s. (allows for use of hardware flow control)
+0638                         * Entry: (A) = char to transmit
+0639                         * Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+0640                         *
+0641 F285 34 30              SCHAR   PSHS    X,Y
+0642 F287 34 02                      PSHS    A
+0643                         *
+0644 F289 8E 03 E8                   LDX     #1000         1000x inner loop
+0645 F28C 10 8E 04 E2        SCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+0646 F290 B6 E0 00           SCHAR2  LDA     ACIAC1        test for space in transmit FIFO
+0647 F293 47                         ASRA
+0648 F294 47                         ASRA
+0649 F295 25 0C                      BCS     SCHAR3        send character
+0650 F297 31 3F                      LEAY    -1,Y          else, continue to count delay
+0651 F299 26 F5                      BNE     SCHAR2
+0652 F29B 30 1F                      LEAX    -1,X
+0653 F29D 26 ED                      BNE     SCHAR1
+0654 F29F 35 02                      PULS    A
+0655 F2A1 35 B0                      PULS    X,Y,PC        return with error if timed out
+0656                         *
+0657 F2A3 35 02              SCHAR3  PULS    A
+0658 F2A5 B7 E0 01                   STA     ACIAD1        send data (carry bit still set)
+0659 F2A8 35 B0                      PULS    X,Y,PC
+0660                         *
+0661                         ** 'UF' Format RAMdisc to FLEX standard.
+0662                         *
+0663 F2AA 0A 0D              DISFOS  FCB $0A,$0D 
+0664 F2AC 46 6F 72 6D 61 74          FCC 'Formating RAMdisk... '
+          69 6E 67 20 52 41
+          4D 64 69 73 6B 2E
+          2E 2E 20
+0665 F2C1 04                         FCB 4
+0666 F2C2 0A 0D 04           MESS6   FCB $0A,$0D,4
+0667 F2C5 52 61 6D 64 69 73          FCC 'Ramdisk not allocated! '
+          6B 20 6E 6F 74 20
+          61 6C 6C 6F 63 61
+          74 65 64 21 20
+0668 F2DC 04                 	FCB 4
+0669                         *
+0670 F2DD 8E F2 AA           UFSUB   LDX #DISFOS
+0671 F2E0 BD F4 6A                   JSR PDATA1
+0672 F2E3 8E DE 2A                   LDX #DTYPTAB		search for allocated ramdisk
+0673 F2E6 5F                         CLRB
+0674 F2E7 A6 85              FMT9    LDA B,X
+0675 F2E9 81 01                      CMPA #DTYPRAM		driver type 1 is ramdisk
+0676 F2EB 27 0C                      BEQ FFOUND
+0677 F2ED 5C                         INCB
+0678 F2EE C1 04                      CMPB #4		end of table? then not allocated.
+0679 F2F0 26 F5                      BNE FMT9
+0680 F2F2 8E F2 C2                   LDX #MESS6
+0681 F2F5 BD F4 6A                   JSR PDATA1
+0682 F2F8 39                         RTS
+0683                         *
+0684 F2F9 F7 DE 1E           FFOUND  STB DRVNUM
+0685 F2FC 8E DE 1B                   LDX #DRVNUM-3
+0686 F2FF BD F0 6C                   JSR DRVSEL
+0687                         *
+0688                         * set up free chain
+0689                         *
+0690 F302 8E DE 46                   LDX #BUFFER clear out buffer
+0691 F305 4F                         CLRA
+0692 F306 5F                         CLRB
+0693 F307 A7 80              DFL1    STA 0,X+
+0694 F309 5A                         DECB
+0695 F30A 26 FB                      BNE DFL1
+0696                         *
+0697 F30C 7F DE 1F                   CLR TRACK
+0698 F30F 86 01                      LDA #1
+0699 F311 B7 DE 20                   STA SECTOR
+0700 F314 8E DE 46           DFL2    LDX #BUFFER
+0701 F317 B6 DE 1F                   LDA TRACK
+0702 F31A A7 84                      STA 0,X
+0703 F31C B6 DE 20                   LDA SECTOR
+0704 F31F 4C                         INCA
+0705 F320 81 0F                      CMPA #RMAXSEC+1 last sector on track?
+0706 F322 26 04                      BNE DFL3
+0707 F324 6C 84                      INC 0,X
+0708 F326 86 01                      LDA #1
+0709 F328 A7 01              DFL3    STA 1,X
+0710 F32A B6 DE 1F                   LDA TRACK
+0711 F32D F6 DE 20                   LDB SECTOR
+0712 F330 BD F0 5B                   JSR WRITSC
+0713 F333 7C DE 20                   INC SECTOR
+0714 F336 B6 DE 20                   LDA SECTOR
+0715 F339 81 0F                      CMPA #RMAXSEC+1
+0716 F33B 26 D7                      BNE DFL2
+0717 F33D 86 01                      LDA #1
+0718 F33F B7 DE 20                   STA  SECTOR
+0719 F342 7C DE 1F                   INC TRACK
+0720 F345 B6 DE 1F                   LDA TRACK
+0721 F348 81 40                      CMPA #RMAXTRK
+0722 F34A 26 C8                      BNE DFL2
+0723                         * break free chain at last track/sector
+0724 F34C 8E DE 46                   LDX  #BUFFER
+0725 F34F 86 3F                      LDA  #RMAXTRK-1
+0726 F351 C6 0E                      LDB  #RMAXSEC
+0727 F353 BD F0 57                   JSR  READSC
+0728 F356 8E DE 46                   LDX  #BUFFER
+0729 F359 6F 84                      CLR  0,X
+0730 F35B 6F 01                      CLR  1,X
+0731 F35D 86 3F                      LDA  #RMAXTRK-1
+0732 F35F C6 0E                      LDB  #RMAXSEC
+0733 F361 BD F0 5B                   JSR  WRITSC 
+0734                         * set up sector structure, SIR, directory etc
+0735 F364 8E DE 46                   LDX  #BUFFER
+0736 F367 4F                         CLRA
+0737 F368 C6 0E                      LDB  #RMAXSEC
+0738 F36A BD F0 57                   JSR  READSC
+0739 F36D 8E DE 46                   LDX  #BUFFER
+0740 F370 6F 84                      CLR  0,X break end of directory chain
+0741 F372 6F 01                      CLR  1,X
+0742 F374 4F                         CLRA
+0743 F375 C6 0E                      LDB  #RMAXSEC
+0744 F377 BD F0 5B                   JSR  WRITSC
+0745                         *
+0746 F37A 8E DE 46                   LDX  #BUFFER
+0747 F37D 4F                         CLRA
+0748 F37E C6 03                      LDB  #3 set up SIR
+0749 F380 BD F0 57                   JSR  READSC
+0750 F383 8E DE 46                   LDX  #BUFFER
+0751 F386 6F 84                      CLR  0,X break forward link
+0752 F388 6F 01                      CLR  1,X
+0753 F38A CC 52 41                   LDD  #$5241 set volume name (RAMDISK )
+0754 F38D ED 88 10                   STD  16,X
+0755 F390 CC 4D 44                   LDD  #$4D44
+0756 F393 ED 88 12                   STD  18,X
+0757 F396 CC 49 53                   LDD  #$4953
+0758 F399 ED 88 14                   STD  20,X
+0759 F39C CC 4B 20                   LDD  #$4B20
+0760 F39F ED 88 16                   STD  22,X
+0761 F3A2 CC 00 01                   LDD  #1 volume number
+0762 F3A5 ED 88 1B                   STD  27,X
+0763 F3A8 CC 01 01                   LDD  #$0101 first trk/sec  01-01
+0764 F3AB ED 88 1D                   STD  29,X
+0765 F3AE 86 3F                      LDA  #RMAXTRK-1
+0766 F3B0 C6 0E                      LDB  #RMAXSEC
+0767 F3B2 ED 88 1F                   STD  31,X
+0768 F3B5 ED 88 26                   STD  38,X
+0769 F3B8 CC 03 72                   LDD  #RTOTSEC total DATA sectors (2912-14)
+0770 F3BB ED 88 21                   STD  33,X
+0771                         *
+0772 F3BE 86 01                      LDA #01 month   set default creation date (SYS09's birthday!)
+0773 F3C0 A7 88 23                   STA 35,X
+0774 F3C3 86 07                      LDA #07 day
+0775 F3C5 A7 88 24                   STA 36,X
+0776 F3C8 86 07                      LDA #07 year
+0777 F3CA A7 88 25                   STA 37,X
+0778                         *
+0779 F3CD 4F                 RF3     CLRA
+0780 F3CE C6 03                      LDB  #3
+0781 F3D0 BD F0 5B                   JSR  WRITSC
+0782                         *
+0783 F3D3 8E DE 46                   LDX #BUFFER
+0784 F3D6 4F                         CLRA
+0785 F3D7 C6 01                      LDB #1
+0786 F3D9 BD F0 57                   JSR READSC
+0787 F3DC 8E DE 46                   LDX #BUFFER
+0788 F3DF 86 AA                      LDA #$AA set the init flag
+0789 F3E1 A7 84                      STA 0,X
+0790 F3E3 86 55                      LDA  #$55
+0791 F3E5 A7 01                      STA 1,X
+0792 F3E7 4F                         CLRA
+0793 F3E8 C6 01                      LDB #1
+0794 F3EA 7E F0 5B                   JMP WRITSC
+0795                         *
+0796                         ********************************
+0797                         *    System specific Boot      *
+0798                         *    command goes here.        *
+0799                         ********************************
+0800                         *
+0801                         * Boot FLEX from the FPGA's internal pre-loaded scratch RAM
+0802                         *
+0803 F3ED 08 08              UBMESS  FCB $08, $08
+0804 F3EF 42 6F 6F 74 69 6E          FCC 'Booting internal FLEX....'
+          67 20 69 6E 74 65
+          72 6E 61 6C 20 46
+          4C 45 58 2E 2E 2E
+          2E
+0805 F408 0D 0A 04                   FCB $0D,$0A,$04
+0806                         *
+0807 F40B 8E F3 ED           UBSUB   LDX #UBMESS
+0808 F40E BD F4 6A                   JSR PDATA1
+0809                         *
+0810 F411 8E D3 E5                   LDX #$D3E5
+0811 F414 10 8E F4 34                LDY #CONTAB Overlay console driver table
+0812 F418 EC A1              UB1     LDD 0,Y++
+0813 F41A ED 81                      STD 0,X++
+0814 F41C 8C D3 FD                   CMPX #$D3FD
+0815 F41F 26 F7                      BNE UB1
+0816                         *
+0817 F421 8E DE 00                   LDX #$DE00 Overlay disk driver table
+0818 F424 10 8E F4 4C                LDY #DISTAB
+0819 F428 EC A1              UB2     LDD 0,Y++
+0820 F42A ED 81                      STD 0,X++
+0821 F42C 8C DE 1E                   CMPX #$DE1E
+0822 F42F 26 F7                      BNE UB2
+0823                         *
+0824 F431 7E CD 00           UBEND   JMP $CD00
+0825                         *
+0826                         * FLEX console jump table.
+0827 F434 F4 76              CONTAB  FDB INPNE       INPUT NO ECHO
+0828 F436 F4 82                      FDB DUMMY       INTERRUPT HANDLER
+0829 F438 DF C2                      FDB MONRAM+$02 SWI VECTOR
+0830 F43A DF C8                      FDB MONRAM+$08 IRQ VECTOR
+0831 F43C F4 82                      FDB DUMMY       TIMER OFF
+0832 F43E F4 82                      FDB DUMMY       TIMER ON
+0833 F440 F4 82                      FDB DUMMY       TIMER INITIALIZATION
+0834 F442 F4 7E                      FDB CONTRL      MONITOR
+0835 F444 F4 82                      FDB DUMMY       TERMINAL INITIALIZATION
+0836 F446 F4 7A                      FDB STATUS      INPUT CHECK
+0837 F448 F4 6E                      FDB OUTP        TERMINAL OUTPUT
+0838 F44A F4 72                      FDB INPE        TERMINAL INPUT WITH ECHO
+0839                         *
+0840                         * FLEX disk jump table.
+0841 F44C 7E F0 57           DISTAB  JMP READSC
+0842 F44F 7E F0 5B                   JMP WRITSC
+0843 F452 7E F0 5F                   JMP BUSY
+0844 F455 7E F0 63                   JMP RESTR1
+0845 F458 7E F0 6C                   JMP DRVSEL
+0846 F45B 7E F0 9F                   JMP CHKRDY
+0847 F45E 7E F0 A3                   JMP CHKQIK
+0848 F461 7E F0 A7                   JMP DINIT
+0849 F464 7E F0 BF                   JMP DWARM
+0850 F467 7E F0 C3                   JMP SEEKTS
+0851                         *
+0852                         * Monitor jumps
+0853                         *
+0854 F46A 6E 9F F8 0C        PDATA1  JMP [PDATAV]
+0855 F46E 6E 9F F8 0A        OUTP    JMP [OUTCHV]
+0856 F472 6E 9F F8 06        INPE    JMP [INCHEV]
+0857 F476 6E 9F F8 04        INPNE   JMP [INCHV]
+0858 F47A 6E 9F F8 08        STATUS  JMP [INCHKV]
+0859 F47E 6E 9F F8 00        CONTRL  JMP [MONITV]
+0860 F482 39                 DUMMY   RTS
+0861                         *
+0862                         ** 'UL' LOAD ROM DISK VIA SERIAL PORT
+0863                         *
+0864 F483 53 65 72 69 61 6C  ULMES   FCC  'Serial ROM Disk upload ...'
+          20 52 4F 4D 20 44
+          69 73 6B 20 75 70
+          6C 6F 61 64 20 2E
+          2E 2E
+0865 F49D 0D 0A 04                   FCB  $0D,$0A,$04
+0866 F4A0 52 4F 4D 20 44 69  ULMES1  FCC  'ROM Disk Loaded'
+          73 6B 20 4C 6F 61
+          64 65 64
+0867 F4AF 0D 0A 04                   FCB  $0D,$0A,$04
+0868                         *
+0869 F4B2 8E F4 83           ULSUB   LDX  #ULMES
+0870 F4B5 BD F4 6A                   JSR  PDATA1
+0871                         *
+0872 F4B8 86 00                      LDA  #$00
+0873 F4BA B7 DE 1E                   STA  DRVNUM
+0874 F4BD 4F                         CLRA         TRACK 0
+0875 F4BE C6 01                      LDB  #$01    SECTOR 1
+0876 F4C0 B7 DE 1F           ULLOOP0 STA  TRACK
+0877 F4C3 F7 DE 20                   STB  SECTOR`
+0878 F4C6 17 FB FE                   LBSR MAPIN
+0879                         *
+0880 F4C9 5F                         CLRB  xfer 256 bytes at a time.
+0881 F4CA BD F4 ED           ULLOOP1 JSR  LRBYTE transfer should be hex bytes
+0882 F4CD A7 C0                      STA  ,U+
+0883 F4CF 5A                         DECB
+0884 F4D0 26 F8                      BNE  ULLOOP1
+0885                         *
+0886 F4D2 17 FC 26                   LBSR MAPOUT
+0887                         *
+0888 F4D5 B6 DE 1F                   LDA  TRACK
+0889 F4D8 F6 DE 20                   LDB  SECTOR
+0890 F4DB 5C                         INCB
+0891 F4DC C1 0F                      CMPB #EMAXSEC+1
+0892 F4DE 26 E0                      BNE  ULLOOP0
+0893 F4E0 C6 01                      LDB  #1
+0894 F4E2 4C                         INCA
+0895 F4E3 81 30                      CMPA #EMAXTRK
+0896 F4E5 26 D9                      BNE  ULLOOP0
+0897                         *
+0898 F4E7 8E F4 A0           ULEXIT  LDX  #ULMES1
+0899 F4EA 7E F4 6A                   JMP  PDATA1
+0900                         *
+0901                         * Read a byte from the serial port
+0902                         *
+0903 F4ED 34 04              LRBYTE  PSHS B
+0904 F4EF 8D 0E                      BSR  LRHEX                  Get hex digit.
+0905 F4F1 48                         ASLA
+0906 F4F2 48                         ASLA                           Shift to msb.
+0907 F4F3 48                         ASLA
+0908 F4F4 48                         ASLA
+0909 F4F5 1F 89                      TFR  A,B                    Save in B.
+0910 F4F7 8D 06                      BSR  LRHEX                  Get next digit.
+0911 F4F9 34 04                      PSHS B
+0912 F4FB AB E0                      ADDA 0,S+                    Add together bytes.
+0913 F4FD 35 84                      PULS B,PC
+0914                         *
+0915 F4FF BD F5 28           LRHEX   JSR  INTER
+0916 F502 29 FB                      BVS  LRHEX
+0917 F504 80 30                      SUBA #$30                   Remove ascii bias.
+0918 F506 2B F7                      BMI  LRHEX
+0919 F508 81 09                      CMPA #$09                   Number?
+0920 F50A 2F 0A                      BLE  LRHEX1                 Yes.
+0921 F50C 81 11                      CMPA #$11                   Keep testing.
+0922 F50E 2B EF                      BMI  LRHEX
+0923 F510 81 16                      CMPA #$16
+0924 F512 2E EB                      BGT  LRHEX
+0925 F514 80 07                      SUBA #$07
+0926 F516 39                 LRHEX1  RTS
+0927                         *
+0928                         * ACIA INPUT TEST
+0929                         *
+0930 F517 B6 E0 00           INTEST  LDA ACIAC1
+0931 F51A 85 01                      BITA #$01
+0932 F51C 39                         RTS
+0933                         *
+0934                         * RESET ACIA
+0935                         *
+0936 F51D 86 03              ACIRST  LDA #$03 master reset
+0937 F51F B7 E0 00                   STA  ACIAC1
+0938 F522 86 11                      LDA #$11
+0939 F524 B7 E0 00                   STA ACIAC1
+0940 F527 39                         RTS
+0941                         *
+0942                         * ACIA INPUT
+0943                         *
+0944 F528 86 10              INTER   LDA  #16
+0945 F52A B7 DE 27                   STA  DELCNT+0
+0946 F52D 7F DE 28                   CLR  DELCNT+1
+0947 F530 7F DE 29                   CLR  DELCNT+2
+0948 F533 B6 E0 00           INTER0  LDA  ACIAC1
+0949 F536 85 01                      BITA #$01
+0950 F538 26 08                      BNE  INTER1
+0951 F53A 85 78                      BITA #$78
+0952 F53C 27 0A                      BEQ  INTER2
+0953 F53E 8D DD                      BSR  ACIRST
+0954 F540 20 E6                      BRA  INTER
+0955                         *
+0956 F542 B6 E0 01           INTER1  LDA  ACIAD1
+0957 F545 1C 02                      ANDCC #VFLAG
+0958 F547 39                         RTS
+0959                         *
+0960 F548 7A DE 29           INTER2  DEC  DELCNT+2
+0961 F54B 26 E6                      BNE  INTER0
+0962 F54D 7A DE 28                   DEC  DELCNT+1
+0963 F550 26 E1                      BNE  INTER0
+0964 F552 7A DE 27                   DEC  DELCNT+0
+0965 F555 26 DC                      BNE  INTER0
+0966 F557 4F                         CLRA
+0967 F558 1A 02                      ORCC #VFLAG
+0968 F55A 39                         RTS
+0969                         *
+0970                         * ACIA OUTPUT
+0971                         *
+0972 F55B 34 02              OUTTER  PSHS A
+0973                         *
+0974 F55D B6 E0 00           OUTTE1  LDA ACIAC1
+0975 F560 85 02                      BITA #$02
+0976 F562 26 08                      BNE  OUTTE2
+0977 F564 85 78                      BITA #$78
+0978 F566 27 F5                      BEQ  OUTTE1
+0979 F568 8D B3                      BSR  ACIRST
+0980 F56A 20 F1                      BRA  OUTTE1
+0981                         *
+0982 F56C 35 02              OUTTE2  PULS A
+0983 F56E B7 E0 01                   STA ACIAD1
+0984 F571 39                         RTS
+0985                         *
+0986                         ** 'UX' Xmodem ROM Disk upload
+0987                         *
+0988 F572 0D 0A              UXMES   FCB $0D,$0A
+0989 F574 58 6D 6F 64 65 6D          FCC 'Xmodem ROM Disk Upload'
+          20 52 4F 4D 20 44
+          69 73 6B 20 55 70
+          6C 6F 61 64
+0990 F58A 04                         FCB 4
+0991 F58B 0D 0A              UXMES1  FCB $0D,$0A
+0992 F58D 55 70 6C 6F 61 64          FCC 'Upload Complete'
+          20 43 6F 6D 70 6C
+          65 74 65
+0993 F59C 04                         FCB 4
+0994 F59D 0D 0A              UXMES2  FCB $0D,$0A
+0995 F59F 55 70 6C 6F 61 64          FCC 'Upload Error'
+          20 45 72 72 6F 72
+0996 F5AB 04                         FCB 4
+0997                         *
+0998 F5AC 8E F5 72           UXSUB   LDX #UXMES
+0999 F5AF 17 FE B8                   LBSR PDATA1
+1000                         *
+1001 F5B2 86 01                      LDA  #1
+1002 F5B4 B7 DE 23                   STA BLKNUM
+1003 F5B7 8E F6 1A                   LDX  #XSTSTR
+1004 F5BA BF DE 25                   STX  XSTATE
+1005                         *
+1006 F5BD 86 00                      LDA  #$00
+1007 F5BF B7 DE 1E                   STA  DRVNUM
+1008 F5C2 4F                         CLRA         TRACK 0
+1009 F5C3 C6 01                      LDB  #$01    SECTOR 1
+1010 F5C5 B7 DE 1F           UXLOOP0 STA  TRACK
+1011 F5C8 F7 DE 20                   STB  SECTOR
+1012 F5CB 17 FA F9                   LBSR MAPIN
+1013                         *
+1014 F5CE 5F                         CLRB       xfer 256 bytes at a time.
+1015 F5CF 17 00 2B           UXLOOP1 LBSR XBYTE transfer should be hex bytes
+1016 F5D2 25 20                      BCS  UXERR
+1017 F5D4 A7 C0                      STA  ,U+
+1018 F5D6 5A                         DECB
+1019 F5D7 26 F6                      BNE  UXLOOP1
+1020                         *
+1021 F5D9 17 FB 1F                   LBSR MAPOUT
+1022                         *
+1023 F5DC B6 DE 1F                   LDA  TRACK
+1024 F5DF F6 DE 20                   LDB  SECTOR
+1025 F5E2 5C                         INCB
+1026 F5E3 C1 0F                      CMPB #EMAXSEC+1
+1027 F5E5 26 DE                      BNE  UXLOOP0
+1028 F5E7 C6 01                      LDB  #1
+1029 F5E9 4C                         INCA
+1030 F5EA 81 30                      CMPA #EMAXTRK
+1031 F5EC 26 D7                      BNE  UXLOOP0
+1032                         *
+1033 F5EE 8E F5 8B           UXEXIT  LDX  #UXMES1
+1034 F5F1 7E F4 6A                   JMP  PDATA1
+1035                         *
+1036 F5F4 17 FB 04           UXERR   LBSR MAPOUT
+1037 F5F7 8E F5 9D                   LDX  #UXMES2
+1038 F5FA 16 FE 6D                   LBRA PDATA1
+1039                         *
+1040                         * Get a Byte using XModem protocol
+1041                         * Carry clear => no errors
+1042                         * Carry set   => errors
+1043                         *
+1044 F5FD 34 10              XBYTE   PSHS X
+1045 F5FF BE DE 25                   LDX  XSTATE
+1046                         *
+1047 F602 17 FF 23           XBYTE0  LBSR INTER
+1048 F605 28 0A                      BVC  XBYTE1
+1049 F607 86 15                      LDA  #NAK
+1050 F609 17 FF 4F                   LBSR OUTTER
+1051 F60C 8E F6 1A                   LDX  #XSTSTR
+1052 F60F 20 F1                      BRA  XBYTE0
+1053                         *
+1054 F611 AD 84              XBYTE1  JSR  ,X
+1055 F613 26 ED                      BNE  XBYTE0
+1056 F615 BF DE 25                   STX  XSTATE
+1057 F618 35 90                      PULS X,PC
+1058                         *
+1059                         * START - LOOK FOR SOH (START OF HEADER) = $01
+1060                         *
+1061 F61A 81 01              XSTSTR  CMPA #SOH
+1062 F61C 26 06                      BNE  XSTSTR1
+1063 F61E 8E F6 3A                   LDX  #XSTBLK
+1064 F621 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+1065 F623 39                         RTS
+1066                         *
+1067 F624 81 04              XSTSTR1 CMPA #EOT
+1068 F626 26 08                      BNE  XSTSTR2
+1069 F628 86 06                      LDA  #ACK
+1070 F62A 17 FF 2E                   LBSR OUTTER
+1071 F62D 1A 05                      ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+1072 F62F 39                         RTS
+1073                         *
+1074 F630 81 18              XSTSTR2 CMPA #CAN
+1075 F632 26 03                      BNE  XSTSTR3 
+1076 F634 1A 05                      ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+1077 F636 39                         RTS
+1078                         *
+1079 F637 1C FA              XSTSTR3 ANDCC #$FF-CFLAG-ZFLAG
+1080 F639 39                         RTS
+1081                         *
+1082                         * Got SOH
+1083                         * Now get block number
+1084                         *
+1085 F63A B1 DE 23           XSTBLK  CMPA BLKNUM
+1086 F63D 26 06                      BNE  XSTBLKE
+1087 F63F 8E F6 50                   LDX  #XSTCOM
+1088 F642 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+1089 F644 39                         RTS
+1090                         *
+1091                         * Error in block number
+1092                         *
+1093 F645 86 15              XSTBLKE LDA  #NAK
+1094 F647 17 FF 11                   LBSR OUTTER
+1095 F64A 8E F6 1A                   LDX  #XSTSTR
+1096 F64D 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+1097 F64F 39                         RTS
+1098                         *
+1099                         * Get complement of block number
+1100                         *
+1101 F650 43                 XSTCOM  COMA
+1102 F651 B1 DE 23                   CMPA BLKNUM
+1103 F654 26 EF                      BNE  XSTBLKE
+1104 F656 7F DE 21                   CLR  CHKSUM
+1105 F659 86 80                      LDA  #128
+1106 F65B B7 DE 24                   STA  BYTCNT
+1107 F65E 8E F6 64                   LDX  #XSTDAT
+1108 F661 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+1109 F663 39                         RTS
+1110                         *
+1111                         * Get data bytes
+1112                         *
+1113 F664 34 02              XSTDAT  PSHS A
+1114 F666 BB DE 21                   ADDA CHKSUM
+1115 F669 B7 DE 21                   STA  CHKSUM
+1116 F66C 35 02                      PULS A
+1117 F66E 7A DE 24                   DEC  BYTCNT
+1118 F671 26 03                      BNE  XSTDAT1
+1119 F673 8E F6 7B                   LDX  #XSTCHK
+1120 F676 1C FE              XSTDAT1 ANDCC #$FF-CFLAG No abort
+1121 F678 1A 04                      ORCC #ZFLAG      Valid data (exit)
+1122 F67A 39                         RTS
+1123                         *
+1124                         * Byte count reached zero
+1125                         * Check checksum byte
+1126                         *
+1127 F67B B1 DE 21           XSTCHK  CMPA CHKSUM
+1128 F67E 26 07                      BNE  XSTCHK1 retry if wrong checksum
+1129                         *
+1130                         * Checksum OK ... 
+1131                         * increment block number
+1132                         * and send ACK
+1133                         *
+1134 F680 7C DE 23                   INC  BLKNUM
+1135 F683 86 06                      LDA  #ACK
+1136 F685 20 0D                      BRA  XSTCHK2
+1137                         *
+1138                         * Checksum Error detected ...
+1139                         * Reset Sector counter in ACCB to last 128 byte boundary
+1140                         * and send NAK
+1141                         *
+1142 F687 34 04              XSTCHK1 PSHS B
+1143 F689 1F 30                      TFR  U,D
+1144 F68B 5A                         DECB
+1145 F68C C4 80                      ANDB #128 
+1146 F68E 1F 03                      TFR  D,U
+1147 F690 35 04                      PULS B
+1148 F692 86 15                      LDA  #NAK
+1149 F694 17 FE C4           XSTCHK2 LBSR OUTTER
+1150 F697 8E F6 1A                   LDX  #XSTSTR
+1151 F69A 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+1152 F69C 39                         RTS
+1153                         *
+1154                         ** 'UP' Load ROMdisk via config PROM.
+1155                         *
+1156 F69D 08 08              UPMES   FCB  $08,$08
+1157 F69F 4C 6F 61 64 20 52          FCC  'Load ROM disk from config PROM.'
+          4F 4D 20 64 69 73
+          6B 20 66 72 6F 6D
+          20 63 6F 6E 66 69
+          67 20 50 52 4F 4D
+          2E
+1158 F6BE 04                         FCB  4
+1159 F6BF 46 6F 75 6E 64 20  UPMES1  FCC  'Found SYNC, loading data...'
+          53 59 4E 43 2C 20
+          6C 6F 61 64 69 6E
+          67 20 64 61 74 61
+          2E 2E 2E
+1160 F6DA 0A 0D 04                   FCB  $0A,$0D,4
+1161 F6DD 52 4F 4D 20 44 69  UPMES2  FCC  'ROM Disk Loaded.'
+          73 6B 20 4C 6F 61
+          64 65 64 2E
+1162 F6ED 0A 0D 04                   FCB  $0A,$0D,4
+1163 F6F0 52 4F 4D 20 44 69  UPMES3  FCC  'ROM Disk Not Found.'
+          73 6B 20 4E 6F 74
+          20 46 6F 75 6E 64
+          2E
+1164 F703 0A 0D 04                   FCB  $0A,$0D,4
+1165                         *
+1166 F706 8E F6 9D           UPSUB	LDX  #UPMES
+1167 F709 BD F4 6A                   JSR  PDATA1
+1168                         *
+1169 F70C 8D 5A                      BSR  UPRESET
+1170 F70E 10 8E 00 20                LDY  #$0020  Set up count for 2 MBit
+1171 F712 8E 00 00                   LDX  #$0000
+1172 F715 8D 6C              UPSUB1  BSR  UPBIT   Shift in bit
+1173 F717 8D 7C                      BSR  UPSYNC  Test for Sync pattern`
+1174 F719 27 15                      BEQ  UPSUB4  Skip if found
+1175 F71B 30 1F                      LEAX -1,X    Count Down inner loop
+1176 F71D 8C 00 00                   CMPX #$0000
+1177 F720 26 F3                      BNE  UPSUB1   Branch if inner loop not complete
+1178 F722 31 1F                      LEAY -1,X    Count down outer loop
+1179 F724 10 8C 00 00                CMPY #$0000
+1180 F728 26 EB                      BNE  UPSUB1   Branch if outer loop not complete
+1181                         *
+1182 F72A 8E F6 F0                   LDX  #UPMES3 2MBits scanned, no synch, report error
+1183 F72D 7E F4 6A                   JMP  PDATA1
+1184                         *
+1185 F730 8E F6 BF           UPSUB4  LDX  #UPMES1 Sync found, now load disk
+1186 F733 BD F4 6A                   JSR  PDATA1
+1187                         *
+1188 F736 4F                         CLRA
+1189 F737 B7 DE 1E                   STA  DRVNUM   select Drive 0
+1190 F73A C6 01                      LDB  #$01
+1191 F73C B7 DE 1F           UPSUB2  STA  TRACK   track 0
+1192 F73F F7 DE 20                   STB  SECTOR  sector 1
+1193                         *
+1194 F742 17 F9 82                   LBSR MAPIN   map in buffer
+1195 F745 5F                         CLRB         256 byte sector
+1196 F746 8D 67              UPSUB3  BSR  UPBYTE  read byte from prom
+1197 F748 A7 C0                      STA  ,U+     Store in buffer
+1198 F74A 5A                         DECB
+1199 F74B 26 F9                      BNE  UPSUB3  Loop until sector read`
+1200 F74D 17 F9 AB                   LBSR MAPOUT  map out buffer
+1201                         * 
+1202 F750 B6 DE 1F                   LDA  TRACK   Advance sector
+1203 F753 F6 DE 20                   LDB  SECTOR
+1204 F756 5C                         INCB
+1205 F757 C1 0F                      CMPB #EMAXSEC+1 Wrap on max sector count
+1206 F759 26 E1                      BNE  UPSUB2
+1207 F75B C6 01                      LDB  #1
+1208 F75D 4C                         INCA          Advance track
+1209 F75E 81 30                      CMPA #EMAXTRK
+1210 F760 26 DA                      BNE  UPSUB2
+1211                         *
+1212 F762 8E F6 DD           UPEXIT  LDX  #UPMES2  Load complete, report message 
+1213 F765 7E F4 6A                   JMP  PDATA1
+1214                         *
+1215                         * Reset Serial PROM
+1216                         *
+1217 F768 86 02              UPRESET LDA  #PRSTHI    Strobe the reset line
+1218 F76A B7 E0 C0                   STA  PROMREG
+1219 F76D 86 00                      LDA  #PRSTLO
+1220 F76F B7 E0 C0                   STA  PROMREG
+1221 F772 8E 00 00                   LDX  #$0000     Delay a while`
+1222 F775 30 1F              UPRST1  LEAX -1,X
+1223 F777 8C 00 00                   CMPX #$0000
+1224 F77A 26 F9                      BNE  UPRST1
+1225 F77C BF DF 46                   STX  SYNCREG+0  Clear Sync Shift Register
+1226 F77F BF DF 48                   STX  SYNCREG+2
+1227 F782 39                         RTS
+1228                         *
+1229                         * Input 1 Bit From PROM
+1230                         *
+1231 F783 86 01              UPBIT   LDA  #PCLKHI
+1232 F785 B7 E0 C0                   STA  PROMREG
+1233 F788 86 00                      LDA  #PCLKLO
+1234 F78A B7 E0 C0                   STA  PROMREG
+1235 F78D B6 E0 C0                   LDA  PROMREG
+1236 F790 44                         LSRA
+1237 F791 78 DF 49                   ASL  SYNCREG+3
+1238 F794 39                         RTS
+1239                         *
+1240                         * Test for 32 bit Sync Word
+1241                         *
+1242 F795 79 DF 48           UPSYNC  ROL  SYNCREG+2
+1243 F798 79 DF 47                   ROL  SYNCREG+1
+1244 F79B 79 DF 46                   ROL  SYNCREG+0
+1245 F79E CC FF 00                   LDD  #SYNCLO
+1246 F7A1 10 B3 DF 48                CMPD SYNCREG+2
+1247 F7A5 26 07                      BNE  UPSYNCX
+1248 F7A7 CC AA 55                   LDD  #SYNCHI
+1249 F7AA 10 B3 DF 46                CMPD SYNCREG+0
+1250 F7AE 39                 UPSYNCX RTS
+1251                         *
+1252                         * Input 1 Byte From PROM
+1253                         *
+1254 F7AF 34 04              UPBYTE  PSHS B
+1255 F7B1 C6 08                      LDB  #8
+1256 F7B3 8D CE              UPBYTE1 BSR  UPBIT
+1257 F7B5 5A                         DECB
+1258 F7B6 26 FB                      BNE  UPBYTE1
+1259 F7B8 B6 DF 49                   LDA  SYNCREG+3
+1260 F7BB 35 84                      PULS B,PC 
+1261                         * 
+1262                         ***** NEXTCMD ***** 
+1263                         * 
+1264 F7BD 17 FC B2           NEXTEXT LBSR INPE  GET ONE CHAR. FROM TERMINAL 
+1265 F7C0 84 7F                      ANDA #$7F STRIP PARITY FROM CHAR. 
+1266 F7C2 1F 89                      TFR  A,B
+1267 F7C4 86 20                      LDA  #$20 
+1268 F7C6 17 FC A5                   LBSR OUTP PRNT SPACE 
+1269 F7C9 C1 60                      CMPB #$60 
+1270 F7CB 2F 02                      BLE NXTEX0 
+1271 F7CD C0 20                      SUBB #$20 
+1272                         * 
+1273                         ***** DO TABLE LOOKUP ***** 
+1274                         *   FOR COMMAND FUNCTIONS 
+1275                         * 
+1276 F7CF 8E F7 E5           NXTEX0  LDX #EXTTAB    POINT TO JUMP TABLE 
+1277 F7D2 E1 80              NXTEX1  CMPB ,X+       DOES COMMAND MATCH TABLE ENTRY ? 
+1278 F7D4 27 0D                      BEQ  JMPEXT    BRANCH IF MATCH FOUND 
+1279 F7D6 30 02                      LEAX 2,X       POINT TO NEXT ENTRY IN TABLE 
+1280 F7D8 8C F7 F4                   CMPX #EXTEND   REACHED END OF TABLE YET ? 
+1281 F7DB 26 F5                      BNE  NXTEX1    IF NOT END, CHECK NEXT ENTRY 
+1282 F7DD 8E F7 F4                   LDX  #MSGWHAT  POINT TO MSG "WHAT?" 
+1283 F7E0 16 FC 87                   LBRA PDATA1    PRINT MSG AND RETURN
+1284 F7E3 6E 94              JMPEXT  JMP  [,X]      JUMP TO COMMAND ROUTINE 
+1285                         *
+1286                         * EXTENDED COMMAND JUMP TABLE 
+1287                         * 
+1288 F7E5                    EXTTAB EQU * 
+1289 F7E5 42                        FCC 'B'   BOOT FLEX
+1290 F7E6 F4 0B                     FDB UBSUB
+1291 F7E8 4C                        FCC 'L'   LOAD ROM DISK OVER SERIAL PORT
+1292 F7E9 F4 B2                     FDB ULSUB 
+1293 F7EB 46                        FCC 'F'   FORMAT RAM DISK
+1294 F7EC F2 DD                     FDB UFSUB 
+1295 F7EE 50                        FCC 'P'   LOAD ROM DISK FROM PROM
+1296 F7EF F7 06                     FDB UPSUB 
+1297 F7F1 58                        FCC 'X'   XMODEM ROM DISK UPLOAD
+1298 F7F2 F5 AC                     FDB UXSUB
+1299                         * 
+1300 F7F4                    EXTEND EQU * 
+1301                         *
+1302 F7F4 57 48 41 54 20 3F  MSGWHAT FCC "WHAT ?"
+1303 F7FA 0A 0D 04                   FCB $0A,$0D,$04
+0012                                END
+0013                          END COLDS
+Program + Init Data = 7039 bytes
+Error count = 0

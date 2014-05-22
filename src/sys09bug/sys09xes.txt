@@ -1,0 +1,6 @@
+ NAM SYS09BUG FOR XESS
+ INCLUDE "opt_xes.txt"
+ INCLUDE "sys09equ.txt"
+ INCLUDE "sys09ide.txt"
+ INCLUDE "sys09bug.txt"
+ END 

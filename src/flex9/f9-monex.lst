@@ -1,0 +1,1412 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         *
+0002                         ** FLEX 9 DISK DRIVERS
+0003                         *
+0004                         * FOR SYS09BUG ON THE 
+0005                         * DIGILENT SPARTAN 3 STARTER BOARD AND
+0006                         * TERASIC CYCLONE 2 DE1 BOARD
+0007                         * WITH I/O MAPPED AT $XE000
+0008                         * AND ROM MAPPED AT $XF000
+0009                         * THE DIGILENT SPARTAN 3 STARTER BOARD HAS 1MBYTE OF SRAM
+0010                         * THE TERASIC CYCLONE 2 DE1 BOARD HAS 512KBYTE OF SRAM
+0011                         * THE FIRST 64K IS USED BY FLEX,
+0012                         * THE SECOND 128K IS USED AS A ROM DISK
+0013                         * THE REMAINING RAM IS USED FOR A RAM DISK
+0014                         *
+0015                         *
+0016 0001                    CFLAG   EQU $01     CARRY FLAG
+0017 0002                    VFLAG   EQU $02     OVERFLOW FLAG
+0018 0004                    ZFLAG   EQU $04     ZERO FLAG
+0019 0008                    NFLAG   EQU $08     NEGATIVE FLAG
+0020 0010                    IFLAG   EQU $10     IRQ MASK CC
+0021 0020                    HFLAG   EQU $20     HALF CARRY
+0022 0040                    FFLAG   EQU $40     FIRQ MASK CC
+0023 0080                    EFLAG   EQU $80     ENTIRE FLAG
+0024                         *
+0025 0000                    MAPPAG  EQU $00     PAGE $0000 DAT ADDRESS
+f9-monex.txt, line no. 26: Symbol undefined Pass 2
+0026 0000                    DATREG  EQU IC11    DAT REGISTERS
+0027                         *
+0028                         * Serial Port
+0029                         *
+f9-monex.txt, line no. 30: Symbol undefined Pass 2
+0030 0000                    ACIAC1  EQU ACIAS
+f9-monex.txt, line no. 31: Symbol undefined Pass 2
+0031 0001                    ACIAD1  EQU ACIAS+1
+0032 04E2                    DELCON  EQU 1250    Delay (Processor clock in MHz * 50)
+0033                         *
+0034                         * XMODEM Control characters
+0035                         *
+0036 0001                    SOH     EQU $01
+0037 0004                    EOT     EQU $04
+0038 0006                    ACK     EQU $06
+0039 0015                    NAK     EQU $15
+0040 0018                    CAN     EQU $18
+0041                         *
+0042                         * DRIVE GEOMETRY
+0043                         *
+0044 000E                    EMAXSEC EQU 14     ROM DISK
+0045 0030                    EMAXTRK EQU 48     3  * 16 * 14 * 256 = 172,032 Bytes
+0046 0292                    ETOTSEC EQU EMAXTRK*EMAXSEC-EMAXSEC
+0047                         *
+0048 000E                    RMAXSEC EQU 14     RAM DISK
+0049                         *RMAXTRK EQU 192    12 * 16 * 14 * 256 = 688,128 Bytes Digilent Spartan 3
+0050 0040                    RMAXTRK EQU 64    4 * 16 * 14 * 256 = 229,376 Bytes Terasic Cyclone 2
+0051 0372                    RTOTSEC EQU RMAXTRK*RMAXSEC-RMAXSEC
+0052                         *
+0053                         * DRIVE TYPES
+0054                         *
+0055 0000                    DTYPROM EQU 0      ROM DISK
+0056 0001                    DTYPRAM EQU 1      RAM DISK
+0057 0002                    DTYPFLS EQU 2      FLASH DISK
+0058 0003                    DTYPNET EQU 3      FLEXNET DISK
+0059                         *
+0060 DE00                           ORG   $DE00
+0061                         *  
+0062                         * DISK DRIVER JUMP TABLE LAST UPDATE: 22/12/2006
+0063                         * Disk driver for RAM Disk.
+0064                         *
+0065                         * 14 SECTORS PER TRACK
+0066                         * 16 * N TRACKS PER DISK
+0067                         *
+0068                         * ROM DISK OCCUPIES $10000 - $1E000 ... $30000 - $3E000
+0069                         * RAM DISK OCCUPIES $40000 - $4E000 ... $F0000 - $FE000
+0070                         * Track Buffer page mapped at $E000 - $EFFF
+0071                         * MAPPAG = $00 = 0 x $1000 (4 K pages)
+0072                         
+0073                         * ON SWTPC ROM AT $XF000 AND IO AT $XE000
+0074                         * APPEARS THROUGHOUT THE MEMORY SO MUST BE SKIPPED OVER
+0075                         * WHEN USING RAM AS A RAMDISK.
+0076                         * THE MSN OF THE TRACK MAPS INTO THE MSN OF THE DAT
+0077                         * THE LSN OF THE TRACK NUMBER INDEXES INTO THE 4K RAM PAGE
+0078                         * THE SECTOR MAPS INTO THE LSN OF THE DAT WHICH IS INVERTED
+0079                         *
+0080                         *
+0081                         *
+0082                         * FLEX disk jump table.
+0083                         *
+0084 DE00 0E 57              READ   JMP   READSC
+f9-monex.txt, line no. 85: Phasing Error
+0085 DE02 0E 5B              WRITE  JMP   WRITSC
+f9-monex.txt, line no. 86: Phasing Error
+0086 DE04 0E 5F              VERIFY JMP   BUSY
+f9-monex.txt, line no. 87: Phasing Error
+0087 DE06 0E 63              RESTOR JMP   RESTR1
+f9-monex.txt, line no. 88: Phasing Error
+0088 DE08 0E 6C              DRIVE  JMP   DRVSEL
+f9-monex.txt, line no. 89: Phasing Error
+0089 DE0A 0E 9F              DRVRDY JMP   CHKRDY
+f9-monex.txt, line no. 90: Phasing Error
+0090 DE0C 0E A3              QUICK  JMP   CHKQIK
+f9-monex.txt, line no. 91: Phasing Error
+0091 DE0E 0E A7              COLDDR JMP   DINIT
+f9-monex.txt, line no. 92: Phasing Error
+0092 DE10 0E BF              WARMDR JMP   DWARM
+f9-monex.txt, line no. 93: Phasing Error
+0093 DE12 0E C3              SEEK   JMP   SEEKTS
+0094                         *
+0095                         * RAM SPACE
+0096                         *
+f9-monex.txt, line no. 97: Phasing Error
+0097 DE14 00                 DRVNUM  FCB  0
+f9-monex.txt, line no. 98: Phasing Error
+0098 DE15 00                 TRACK   FCB  0
+f9-monex.txt, line no. 99: Phasing Error
+0099 DE16 00                 SECTOR  FCB  0
+f9-monex.txt, line no. 100: Phasing Error
+0100 DE17 00                 CHKSUM  FCB  0
+f9-monex.txt, line no. 101: Phasing Error
+0101 DE18 00                 CCSAVE  FCB  0
+f9-monex.txt, line no. 102: Phasing Error
+0102 DE19 00                 BLKNUM  FCB  0 Xmodem block number
+f9-monex.txt, line no. 103: Phasing Error
+0103 DE1A 00                 BYTCNT  FCB  0 Xmodem byte count
+f9-monex.txt, line no. 104: Phasing Error
+0104 DE1B 00 00              XSTATE  FDB  0 Xmodem State Vector
+f9-monex.txt, line no. 105: Phasing Error
+0105 DE1D 00 00 00           DELCNT  FCB  $00,$00,$00 Xmodem Poll timer
+0106                         *
+0107                         * Disc driver type table.
+0108                         * Indexed by drive number
+0109                         *
+f9-monex.txt, line no. 110: Phasing Error
+0110 DE20 00                 DTYPTAB FCB  DTYPROM Drive 0 (ROM Disk)
+0111 DE21 01                         FCB  DTYPRAM Drive 1 (RAM Disk)
+0112 DE22 02                         FCB  DTYPFLS Drive 2 (FLASH Disk)
+0113 DE23 03                         FCB  DTYPNET Drive 3 (NETPC Disk)
+0114                         *
+0115                         * RAM Disk offset
+0116                         * Indexed by drive type
+0117                         *
+f9-monex.txt, line no. 118: Phasing Error
+0118 DE24 10                 DOFFTAB FCB  $10 ROM Disk $10000
+0119 DE25 40                         FCB  $40 RAM DISK $40000
+0120 DE26 FF                         FCB  $FF Flash Disk
+0121 DE27 FF                         FCB  $FF NETPC Disk
+0122                         *
+f9-monex.txt, line no. 123: Phasing Error
+0123 DE28                    REAVEC  RMB  2             Disc driver jump table.
+f9-monex.txt, line no. 124: Phasing Error
+0124 DE2A                    WRIVEC  RMB  2
+f9-monex.txt, line no. 125: Phasing Error
+0125 DE2C                    VERVEC  RMB  2
+f9-monex.txt, line no. 126: Phasing Error
+0126 DE2E                    RSTVEC  RMB  2
+f9-monex.txt, line no. 127: Phasing Error
+0127 DE30                    DRVVEC  RMB  2
+f9-monex.txt, line no. 128: Phasing Error
+0128 DE32                    CHKVEC  RMB  2
+f9-monex.txt, line no. 129: Phasing Error
+0129 DE34                    QUIVEC  RMB  2
+f9-monex.txt, line no. 130: Phasing Error
+0130 DE36                    INIVEC  RMB  2
+f9-monex.txt, line no. 131: Phasing Error
+0131 DE38                    WARVEC  RMB  2
+f9-monex.txt, line no. 132: Phasing Error
+0132 DE3A                    SEEVEC  RMB  2
+0133                         *
+0134                         * SECTOR BUFFER
+0135                         *
+f9-monex.txt, line no. 136: Phasing Error
+0136 DE3C                    BUFFER  RMB  256
+f9-monex.txt, line no. 137: Phasing Error
+0137 DF3C                    SYNCREG RMB  4      Prom input register
+0138                         *
+0139                         ****************************************
+0140                         *
+0141                         * START OF EXTENSION COMMANDS
+0142                         *
+0143                         ****************************************
+0144                         *
+f9-monex.txt, line no. 145: Symbol undefined Pass 2
+0145 0000                            ORG MONEXT
+0146 0000 07 9C                      FDB NEXTEXT   Jump to next extended command
+0147                         *
+0148                         *
+0149                         *****************************************
+0150                         * Disk drivers                          *
+0151                         * ------------                          *
+0152                         * The system dependant code for the     *
+0153                         * disc drivers fits here. Two tables    *
+0154                         * must be included. These are DTYPTAB a  *
+0155                         * four byte table that defines which of *
+0156                         * the (up to four) following sets of    *
+0157                         * jump tables to use, and TABSRT the    *
+0158                         * jump tables themselves. For a full    *
+0159                         * description of the floppy drivers see *
+0160                         * section 4 (pp9-14) of the general     *
+0161                         * Flex adaptation guide.                *
+0162                         *****************************************
+0163                         *
+0164                         * Mass storage drivers for embedded applications.
+0165                         *
+0166                         * Jump tables.
+0167 0002 01 17              TABSRT  FDB EREAD Drive type 0 (ROM disk).
+0168 0004 01 3F                      FDB EWRITE
+0169 0006 01 3D                      FDB ECHECK
+0170 0008 01 3D                      FDB ECHECK
+0171 000A 01 3D                      FDB ECHECK
+0172 000C 01 3D                      FDB ECHECK
+0173 000E 01 3D                      FDB ECHECK
+0174 0010 00 52                      FDB DDUMMY
+0175 0012 00 52                      FDB DDUMMY
+0176 0014 00 52                      FDB DDUMMY
+0177                         *
+0178 0016 01 17                      FDB EREAD Drive type 1 (RAM disk).
+0179 0018 01 3F                      FDB EWRITE
+0180 001A 01 3D                      FDB ECHECK
+0181 001C 01 3D                      FDB ECHECK
+0182 001E 01 3D                      FDB ECHECK
+0183 0020 01 3D                      FDB ECHECK
+0184 0022 01 3D                      FDB ECHECK
+0185 0024 00 52                      FDB DDUMMY
+0186 0026 00 52                      FDB DDUMMY
+0187 0028 00 52                      FDB DDUMMY
+0188                         *
+0189 002A 00 52                      FDB DDUMMY Drive type 2 (External Flash disk).
+0190 002C 00 52                      FDB DDUMMY
+0191 002E 00 52                      FDB DDUMMY
+0192 0030 00 52                      FDB DDUMMY
+0193 0032 00 52                      FDB DDUMMY
+0194 0034 00 52                      FDB DDUMMY
+0195 0036 00 52                      FDB DDUMMY
+0196 0038 00 52                      FDB DDUMMY
+0197 003A 00 52                      FDB DDUMMY
+0198 003C 00 52                      FDB DDUMMY
+0199                         *
+0200 003E 01 78                      FDB NREAD  Drive type 3 (NetPC drive via serial port).
+0201 0040 01 E7                      FDB NWRITE
+0202 0042 02 47                      FDB NVERIFY
+0203 0044 02 4C                      FDB NCHECK
+0204 0046 02 4C                      FDB NCHECK
+0205 0048 02 4C                      FDB NCHECK
+0206 004A 02 4C                      FDB NCHECK
+0207 004C 00 52                      FDB DDUMMY
+0208 004E 00 52                      FDB DDUMMY
+0209 0050 00 52                      FDB DDUMMY
+0210                         *
+0211                         *
+0212                         * Dummy routine (no errors).
+0213 0052 5F                 DDUMMY  CLRB
+0214 0053 5D                         TSTB  Set (z)=1
+0215 0054 1C FE                      ANDCC  #$FF-CFLAG  Set (c)=0
+0216 0056 39                         RTS
+0217                         *               *
+0218                         **************************
+0219                         * Main Flex entry points *
+0220                         *************************
+0221                         *
+0222                         * Read sector routine.
+0223                         * Entry: (X) = address where sector is to be placed.
+0224                         *        (A) = Track  number.
+0225                         *        (B) = Sector number.
+0226                         * Exit:  (B) = Error code  (z)=1 if no error.
+0227 0057 6E 9F DE 32        READSC  JMP  [REAVEC]
+0228                         *
+0229                         * Write track routine.
+0230                         * Entry: (X) = Address of area of memory from which the data will be taken.
+0231                         *        (A) = Track number.
+0232                         *        (B) = Sector number.
+0233                         * Exit:  (B) = Error condition, (Z)=1 no an error.
+0234 005B 6E 9F DE 34        WRITSC  JMP  [WRIVEC]
+0235                         *
+0236                         * Verify sector routine.
+0237                         * Entry: no parameters.
+0238                         * Exit:  (B) = Error condition (Z)=1 if no error.
+0239 005F 6E 9F DE 36        BUSY  JMP  [VERVEC]
+0240                         *
+0241                         * Restore drive to track 00.
+0242                         * Entry: (X) = FCB address (3,X contains drive number).
+0243                         * Exit:  (B) = Error condition, (Z)=1 if no error.
+0244 0063 8D 07              RESTR1  BSR  DRVSEL Select drive first.
+0245 0065 27 01                      BEQ  RST1
+0246 0067 39                         RTS
+0247 0068 6E 9F DE 38        RST1    JMP  [RSTVEC]
+0248                         *
+0249                         * Select current drive.
+0250                         * Entry: (X) = FCB address (3,X contains drive number).
+0251                         * Exit:  (B) = Error condition, (Z)=0 and (c)=1 if error.
+0252                         *        (B) = $0F if non existant drive.
+0253 006C 34 30              DRVSEL  PSHS  X,Y
+0254 006E E6 03                      LDB  3,X  Get driver type.
+0255 0070 F7 DE 1E                   STB  DRVNUM
+0256 0073 8E DE 2A                   LDX  #DTYPTAB
+0257 0076 A6 85                      LDA  B,X
+0258 0078 81 FF                      CMPA  #$FF  Is the drive nonexistant?
+0259 007A 26 08                      BNE  DRIVE1
+0260 007C 35 30                      PULS  X,Y
+0261 007E C6 0F                      LDB  #$0F
+0262 0080 5D                         TSTB
+0263 0081 1A 01                      ORCC  #$01
+0264 0083 39                         RTS
+0265                         *
+0266 0084 C6 14              DRIVE1  LDB  #20  Get correct table start address.
+0267 0086 3D                         MUL
+0268 0087 8E 00 02                   LDX  #TABSRT
+0269 008A 30 8B                      LEAX  D,X
+0270 008C 10 8E DE 32                LDY  #REAVEC Copy table into ram.
+0271 0090 C6 14                      LDB  #20
+0272 0092 A6 80              DRIVE2  LDA  0,X+
+0273 0094 A7 A0                      STA  0,Y+
+0274 0096 5A                         DECB
+0275 0097 26 F9                      BNE  DRIVE2
+0276 0099 35 30                      PULS X,Y
+0277 009B 6E 9F DE 3A                JMP  [DRVVEC]
+0278                         *
+0279                         * Check for drive ready.
+0280                         * Entry: (X) = FCB address (3,X contains drive number)>
+0281                         * Exit:  (B) = Error condition, (Z)=0 AND (C)=1 if drive is not ready.
+0282 009F 6E 9F DE 3C        CHKRDY  JMP  [CHKVEC]
+0283                         *
+0284                         * Quick drive ready check.
+0285                         * Entry: (X) = FCB address (3,X contains drive number).
+0286                         * Exit:  (B) = Error condition, (Z)=0 AND (c)=1 if drive not ready.
+0287 00A3 6E 9F DE 3E        CHKQIK  JMP  [QUIVEC]
+0288                         *
+0289                         * Init (cold start).
+0290                         * Entry: no parameters.
+0291                         * Exit: no change.
+0292 00A7 4F                 DINIT   CLRA
+0293 00A8 B7 DE 1E           DINIT1  STA  DRVNUM  Init each valid drive in turn.
+0294 00AB 8E DE 1B                   LDX  #DRVNUM-3
+0295 00AE 8D BC                      BSR  DRVSEL
+0296 00B0 25 04                      BCS  DINIT2
+0297 00B2 AD 9F DE 40                JSR  [INIVEC]
+0298 00B6 B6 DE 1E           DINIT2  LDA  DRVNUM
+0299 00B9 4C                         INCA
+0300 00BA 81 04                      CMPA  #4
+0301 00BC 26 EA                      BNE  DINIT1
+0302 00BE 39                         RTS
+0303                         *
+0304                         * Warm start.
+0305                         * Entry: no parameters.
+0306                         * Exit: no change.
+0307 00BF 6E 9F DE 42        DWARM    JMP  [WARVEC]
+0308                         *
+0309                         * Seek track.
+0310                         * Entry: (A) = Track number.
+0311                         *        (B) = Sector number.
+0312                         * Exit:  (B) = Error condition, (Z)=1 if no error.
+0313 00C3 6E 9F DE 44        SEEKTS  JMP  [SEEVEC]
+0314                         *
+0315                         *
+0316                         *****************************************************
+0317                         * ROMdisk drivers                                   *
+0318                         * ---------------                                   *
+0319                         * Drivers to support a ROMdisk in the external RAM  *
+0320                         * of the SYS09. The ROMdisk base address is $10000   *
+0321                         *****************************************************
+0322                         * Dummy return for ROM disk (write protected!)
+0323                         *
+0324                         * MAP RAM DISK INTO MEMORY SPACE
+0325                         *
+0326 00C7 1F A8              MAPIN   TFR   CC,A     ; Save state of interrupt masks
+0327 00C9 B7 DE 22                   STA   CCSAVE
+0328 00CC 1A 50                      ORCC  #FFLAG+IFLAG ; Mask interrupts while IO mapped out
+0329 00CE CE DE 2A                   LDU   #DTYPTAB  ; Point to Drive Type table
+0330 00D1 F6 DE 1E                   LDB   DRVNUM   ; Get working drive number
+0331 00D4 E6 C5                      LDB   B,U
+0332 00D6 CE DE 2E                   LDU   #DOFFTAB
+0333 00D9 B6 DE 1F                   LDA   TRACK
+0334 00DC AB C5                      ADDA  B,U      ; Add Base offset into RAM
+0335 00DE 84 F0                      ANDA  #$F0     ; Mask MSN
+0336 00E0 A7 E2                      STA   ,-S      ; Save A on stack
+0337                         * 
+0338 00E2 B6 DE 20                   LDA   SECTOR
+0339 00E5 80 01                      SUBA  #1       ; Sectors 1 to 14 => 0 to 13
+0340 00E7 88 0F                      EORA  #$0F     ; Complement LSNybble
+0341 00E9 84 0F                      ANDA  #$0F
+0342                         *
+0343 00EB AB E0                      ADDA  ,S+       ; Add sector to LSN of Track and pop
+0344 00ED 97 00                      STA   DATREG+MAPPAG
+0345                         *
+0346 00EF B6 DE 1F                   LDA   TRACK   ; LSN of Track indexes into 4K page
+0347 00F2 84 0F                      ANDA  #$0F
+0348 00F4 8B 00                      ADDA  #MAPPAG*16
+0349 00F6 5F                         CLRB
+0350 00F7 1F 03                      TFR   D,U
+0351 00F9 39                         RTS
+0352                         *
+0353                         * MAP RAM DISK OUT OF MEMORY
+0354                         *
+0355 00FA 86 00              MAPOUT  LDA   #MAPPAG  ; Point to the Flex page
+0356 00FC 88 0F                      EORA  #$0F     ; Complement LSNybble
+0357 00FE 97 00                      STA   DATREG+MAPPAG ; map in Flex page
+0358 0100 B6 DE 22                   LDA   CCSAVE   ; restore interrupt masks
+0359 0103 1F 8A                      TFR   A,CC
+0360 0105 39                         RTS
+0361                         *
+0362                         * Seek track and sector
+0363                         * A holds track number (0-32)
+0364                         * B holds sector number (1-14)
+0365                         *
+0366 0106 B7 DE 1F           ESEEK   STA   TRACK
+0367 0109 F7 DE 20                   STB   SECTOR
+0368 010C 1C FE                      ANDCC #$FE   ; CLEAR CARRY
+0369 010E 1A 04                      ORCC  #$04   ; SET Z
+0370 0110 39                         RTS
+0371                         *
+0372                         * MARK DISK READ ONLY
+0373                         *
+0374 0111 C6 40              EDUMMY  LDB  #$40
+0375 0113 5D                         TSTB
+0376 0114 1A 01                      ORCC  #$01
+0377 0116 39                         RTS
+0378                         *
+0379 0117 34 70              EREAD   PSHS X,Y,U push sequentialy to preserve order on stack
+0380 0119 17 FF EA                   LBSR ESEEK
+0381 011C 17 FF A8                   LBSR MAPIN build external ram address
+0382                         *
+0383 011F 10 8E DE 46                LDY #BUFFER
+0384 0123 5F                         CLRB
+0385 0124 A6 C0              ERLOOP1 LDA 0,U+ move 256 bytes to buffer from external RAM
+0386 0126 A7 A0                      STA 0,Y+
+0387 0128 5A                         DECB
+0388 0129 26 F9                      BNE ERLOOP1
+0389                         *
+0390 012B 17 FF CC                   LBSR MAPOUT
+0391                         *
+0392 012E 10 8E DE 46                LDY #BUFFER
+0393 0132 5F                         CLRB
+0394 0133 A6 A0              ERLOOP2 LDA 0,Y+ move 256 bytes from buffer to Flex RAM
+0395 0135 A7 80                      STA 0,X+
+0396 0137 5A                         DECB
+0397 0138 26 F9                      BNE ERLOOP2
+0398                         *
+0399 013A 5F                         CLRB
+0400 013B 35 F0                      PULS X,Y,U,PC  restore all registers
+0401                         *
+0402                         * check for marker bytes $AA55 in first bytes of first track/sector
+0403                         *
+0404                         *ECHECK  CLRA 
+0405                         *        LDB  #1
+0406                         *        LDX  #BUFFER
+0407                         *        BSR  EREAD
+0408                         *        LDD  BUFFER
+0409                         *        CMPD  #$AA55
+0410                         *        BNE  EERR
+0411                         *        LBRA  DDUMMY
+0412                         *EERR    LDB  #$80 not ready bit set
+0413                         *        TSTB
+0414                         *        ORCC  #$01
+0415                         *        RTS
+0416 013D 5F                 ECHECK CLRB
+0417 013E 39                        RTS
+0418                         *
+0419                         * Write Sector
+0420                         *
+0421 013F 34 70              EWRITE  PSHS X,Y,U
+0422 0141 17 FF C2                   LBSR ESEEK
+0423 0144 CE DE 2A                   LDU  #DTYPTAB  ; Point to Drive Type table
+0424 0147 F6 DE 1E                   LDB  DRVNUM    ; Get working drive number
+0425 014A E6 C5                      LDB  B,U       ; Fetch Drive type
+0426 014C C1 01                      CMPB #DTYPRAM  ; Is it a RAM Disk ?
+0427 014E 27 07                      BEQ  EWOK      ; Yep, can write to it
+0428 0150 C1 00                      CMPB #DTYPROM  ; Allow writes to ROM Disk too
+0429 0152 27 03                      BEQ  EWOK
+0430 0154 16 FF BA                   LBRA EDUMMY    ; Nope report read only 
+0431                         *
+0432 0157 10 8E DE 46        EWOK    LDY #BUFFER
+0433 015B 5F                         CLRB
+0434 015C A6 80              EWLOOP1 LDA 0,X+ move 256 bytes to buffer from Flex RAM
+0435 015E A7 A0                      STA 0,Y+
+0436 0160 5A                         DECB
+0437 0161 26 F9                      BNE EWLOOP1
+0438                         *
+0439 0163 17 FF 61                   LBSR MAPIN
+0440                         *
+0441 0166 10 8E DE 46                LDY #BUFFER
+0442 016A 5F                         CLRB
+0443 016B A6 A0              EWLOOP2 LDA 0,Y+ move 256 bytes from buffer to external RAM
+0444 016D A7 C0                      STA 0,U+
+0445 016F 5A                         DECB
+0446 0170 26 F9                      BNE EWLOOP2
+0447                         *
+0448 0172 17 FF 85                   LBSR MAPOUT
+0449                         *
+0450 0175 5F                 	CLRB
+0451 0176 35 F0                      PULS X,Y,U,PC
+0452                         *
+0453                         *
+0454                         *****************************************************
+0455                         * FlexNet drivers                                   *
+0456                         * ---------------                                   *
+0457                         * Drivers to support a remote connection via the    *
+0458                         * serial port using the FlexNet protocol as defined *
+0459                         * in FLEXNet_421B                                   *
+0460                         *****************************************************
+0461                         *
+0462                         *
+0463                         * read sector from remote drive
+0464                         *
+0465 0178 34 04              NREAD   PSHS    B
+0466 017A 34 02                      PSHS    A
+0467 017C 7F DE 21                   CLR     CHKSUM          clear checksum
+0468 017F 7F DE 22                   CLR     CHKSUM+1
+0469                         *	
+0470 0182 86 73                      LDA     #'s             Send read sector command
+0471 0184 BD 02 81                   JSR     SCHAR
+0472 0187 24 4C                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0473                         *
+0474 0189 B6 DE 1E                   LDA     DRVNUM           send drive
+0475 018C BD 02 81                   JSR     SCHAR
+0476 018F 24 44                      BCC     NRD_DNR           
+0477                         *
+0478 0191 35 02                      PULS    A               send track
+0479 0193 BD 02 81                   JSR     SCHAR
+0480 0196 24 3D                      BCC     NRD_DNR          
+0481                         *
+0482 0198 35 02                      PULS    A               send sector
+0483 019A BD 02 81                   JSR     SCHAR
+0484 019D 24 36                      BCC     NRD_DNR          
+0485                         *
+0486                         * transfer 256 bytes
+0487 019F 5F                         CLRB                    
+0488 01A0 BD 02 65           NREAD1  JSR     RCHAR           read byte
+0489 01A3 24 30                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0490 01A5 A7 80                      STA     0,X+
+0491 01A7 BB DE 22                   ADDA    CHKSUM+1        update checksum
+0492 01AA B7 DE 22                   STA     CHKSUM+1
+0493 01AD 24 03                      BCC     NREAD2         
+0494 01AF 7C DE 21                   INC     CHKSUM
+0495 01B2 5A                 NREAD2  DECB         
+0496 01B3 26 EB                      BNE     NREAD1          
+0497                         *
+0498                         * compare checksums
+0499 01B5 BD 02 65                   JSR     RCHAR           get checksum msb
+0500 01B8 24 1B                      BCC     NRD_DNR
+0501 01BA 34 02                      PSHS    A
+0502 01BC BD 02 65                   JSR     RCHAR           get checksum lsb
+0503 01BF 24 14                      BCC     NRD_DNR
+0504 01C1 1F 89                      TFR     A,B            
+0505 01C3 35 02                      PULS    A               
+0506 01C5 10 B3 DE 21                CMPD    CHKSUM          compare checksums
+0507 01C9 26 0E                      BNE     NRD_ERR         if checksum error, then flag crc read error
+0508                         *
+0509 01CB 86 06                      LDA     #ACK            no checksum error, send ACK char
+0510 01CD BD 02 81                   JSR     SCHAR
+0511 01D0 24 03                      BCC     NRD_DNR 
+0512 01D2 5F                         CLRB                    all OK, flag no error
+0513 01D3 20 0D                      BRA     NRD_END
+0514                         *
+0515 01D5 C6 10              NRD_DNR LDB     #16             flag drive not ready
+0516 01D7 20 09                      BRA     NRD_END
+0517                         *
+0518 01D9 86 15              NRD_ERR LDA     #NAK            send NAK
+0519 01DB BD 02 81                   JSR     SCHAR
+0520 01DE 24 F5                      BCC     NRD_DNR  
+0521 01E0 C6 09                      LDB     #09             flag crc read error
+0522                         *
+0523 01E2 F7 DE 21           NRD_END STB     CHKSUM          used by VERIFY
+0524 01E5 5D                         TSTB                    
+0525 01E6 39                         RTS
+0526                         *
+0527                         *
+0528                         * write sector to remote drive
+0529                         *
+0530 01E7 34 04              NWRITE  PSHS B
+0531 01E9 34 02                      PSHS A
+0532 01EB 7F DE 21                   CLR     CHKSUM          clear checksum
+0533 01EE 7F DE 22                   CLR     CHKSUM+1
+0534                         *	
+0535 01F1 86 72                      LDA     #'r             Send write sector command
+0536 01F3 BD 02 81                   JSR     SCHAR
+0537 01F6 24 DD                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0538                         *
+0539 01F8 B6 DE 1E                   LDA     DRVNUM           send drive
+0540 01FB BD 02 81                   JSR     SCHAR
+0541 01FE 24 D5                      BCC     NRD_DNR           
+0542                         *
+0543 0200 35 02                      PULS    A               send track
+0544 0202 BD 02 81                   JSR     SCHAR
+0545 0205 24 CE                      BCC     NRD_DNR          
+0546                         *
+0547 0207 35 02                      PULS    A               send sector
+0548 0209 BD 02 81                   JSR     SCHAR
+0549 020C 24 C7                      BCC     NRD_DNR          
+0550                         *
+0551                         * transfer 256 bytes
+0552 020E 5F                         CLRB                    
+0553 020F A6 80              NWRITE1 LDA     0,X+
+0554 0211 BD 02 81                   JSR     SCHAR           write byte
+0555 0214 24 BF                      BCC     NRD_DNR         if timeout, then flag drive not ready
+0556 0216 BB DE 22                   ADDA    CHKSUM+1        update checksum
+0557 0219 B7 DE 22                   STA     CHKSUM+1
+0558 021C 24 03                      BCC     NWRITE2         
+0559 021E 7C DE 21                   INC     CHKSUM
+0560 0221 5A                 NWRITE2 DECB         
+0561 0222 26 EB                      BNE     NWRITE1          
+0562                         *
+0563                         * compare checksums
+0564 0224 B6 DE 21                   LDA     CHKSUM
+0565 0227 BD 02 81                   JSR     SCHAR           send checksum msb
+0566 022A 24 A9                      BCC     NRD_DNR
+0567 022C B6 DE 22                   LDA     CHKSUM+1
+0568 022F BD 02 81                   JSR     SCHAR           send checksum lsb
+0569 0232 24 A1                      BCC     NRD_DNR
+0570                         *
+0571 0234 BD 02 65                   JSR     RCHAR           get checksum response
+0572 0237 24 9C                      BCC     NRD_DNR        
+0573 0239 81 06                      CMPA    #ACK
+0574 023B 26 03                      BNE     NWR_ERR         if checksum error, then flag write error    
+0575                         *
+0576 023D 5F                         CLRB                    all OK, flag no error
+0577 023E 20 02                      BRA     NWR_END
+0578                         *
+0579 0240 C6 0A              NWR_ERR LDB     #10             flag write error
+0580                         *
+0581 0242 F7 DE 21           NWR_END STB     CHKSUM          used by VERIFY
+0582 0245 5D                         TSTB                    
+0583 0246 39                         RTS
+0584                         *
+0585                         *
+0586                         *   verify last sector written to remote drive
+0587                         *
+0588 0247 F6 DE 21           NVERIFY LDB     CHKSUM         test last checksum
+0589 024A 5D                         TSTB
+0590 024B 39                         RTS
+0591                         *
+0592                         *
+0593                         *   quck check and check drive ready
+0594                         *
+0595 024C 86 51              NCHECK  LDA     #'Q             quick check command
+0596 024E BD 02 81                   JSR     SCHAR
+0597 0251 24 0C                      BCC     NCK_ERR         if timeout, then flag drive not ready
+0598                         
+0599 0253 BD 02 65                   JSR     RCHAR           get response from host
+0600 0256 24 07                      BCC     NCK_ERR
+0601 0258 81 06                      CMPA    #ACK
+0602 025A 26 03                      BNE     NCK_ERR         if NAK, then flag drive not ready
+0603                         
+0604 025C 5F                         CLRB                    all OK, flag drive ready
+0605 025D 20 04                      BRA     NCK_END
+0606                         *
+0607 025F C6 10              NCK_ERR LDB     #16             report drive not ready
+0608 0261 1A 01                      ORCC    #$01            check needs carry set as well
+0609                         *
+0610 0263 5D                 NCK_END TSTB
+0611 0264 39                         RTS
+0612                         *
+0613                         *
+0614                         * recieve char from remote drive.
+0615                         * timeout if no response for approx 1s.
+0616                         * Entry: no parameters
+0617                         * Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+0618                         *
+0619 0265 34 30              RCHAR   PSHS    X,Y
+0620                         *
+0621 0267 8E 03 E8                   LDX     #1000         1000x inner loop
+0622 026A 10 8E 04 E2        RCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+0623 026E 96 00              RCHAR2  LDA     ACIAC1        test for recieved char
+0624 0270 47                         ASRA
+0625 0271 25 0A                      BCS     RCHAR3        get character
+0626 0273 31 3F                      LEAY    -1,Y          else, continue to count delay
+0627 0275 26 F7                      BNE     RCHAR2
+0628 0277 30 1F                      LEAX    -1,X
+0629 0279 26 EF                      BNE     RCHAR1
+0630 027B 35 B0                      PULS    X,Y,PC        return with error if timed out
+0631                         *
+0632 027D 96 01              RCHAR3  LDA     ACIAD1        return data (carry bit still set)
+0633 027F 35 B0                      PULS    X,Y,PC
+0634                         *
+0635                         *
+0636                         * transmit char to remote drive.
+0637                         * timeout if no response for approx 1s. (allows for use of hardware flow control)
+0638                         * Entry: (A) = char to transmit
+0639                         * Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+0640                         *
+0641 0281 34 30              SCHAR   PSHS    X,Y
+0642 0283 34 02                      PSHS    A
+0643                         *
+0644 0285 8E 03 E8                   LDX     #1000         1000x inner loop
+0645 0288 10 8E 04 E2        SCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+0646 028C 96 00              SCHAR2  LDA     ACIAC1        test for space in transmit FIFO
+0647 028E 47                         ASRA
+0648 028F 47                         ASRA
+0649 0290 25 0C                      BCS     SCHAR3        send character
+0650 0292 31 3F                      LEAY    -1,Y          else, continue to count delay
+0651 0294 26 F6                      BNE     SCHAR2
+0652 0296 30 1F                      LEAX    -1,X
+0653 0298 26 EE                      BNE     SCHAR1
+0654 029A 35 02                      PULS    A
+0655 029C 35 B0                      PULS    X,Y,PC        return with error if timed out
+0656                         *
+0657 029E 35 02              SCHAR3  PULS    A
+0658 02A0 97 01                      STA     ACIAD1        send data (carry bit still set)
+0659 02A2 35 B0                      PULS    X,Y,PC
+0660                         *
+0661                         ** 'UF' Format RAMdisc to FLEX standard.
+0662                         *
+0663 02A4 0A 0D              DISFOS  FCB $0A,$0D 
+0664 02A6 46 6F 72 6D 61 74          FCC 'Formating RAMdisk... '
+          69 6E 67 20 52 41
+          4D 64 69 73 6B 2E
+          2E 2E 20
+0665 02BB 04                         FCB 4
+0666 02BC 0A 0D 04           MESS6   FCB $0A,$0D,4
+0667 02BF 52 61 6D 64 69 73          FCC 'Ramdisk not allocated! '
+          6B 20 6E 6F 74 20
+          61 6C 6C 6F 63 61
+          74 65 64 21 20
+0668 02D6 04                 	FCB 4
+0669                         *
+0670 02D7 8E 02 A4           UFSUB   LDX #DISFOS
+0671 02DA BD 04 50                   JSR PDATA1
+0672 02DD 8E DE 2A                   LDX #DTYPTAB		search for allocated ramdisk
+0673 02E0 5F                         CLRB
+0674 02E1 A6 85              FMT9    LDA B,X
+0675 02E3 81 01                      CMPA #DTYPRAM		driver type 1 is ramdisk
+0676 02E5 27 0C                      BEQ FFOUND
+0677 02E7 5C                         INCB
+0678 02E8 C1 04                      CMPB #4		end of table? then not allocated.
+0679 02EA 26 F5                      BNE FMT9
+0680 02EC 8E 02 BC                   LDX #MESS6
+0681 02EF BD 04 50                   JSR PDATA1
+0682 02F2 39                         RTS
+0683                         *
+0684 02F3 F7 DE 1E           FFOUND  STB DRVNUM
+0685 02F6 8E DE 1B                   LDX #DRVNUM-3
+0686 02F9 9D 6C                      JSR DRVSEL
+0687                         *
+0688                         * set up free chain
+0689                         *
+0690 02FB 8E DE 46                   LDX #BUFFER clear out buffer
+0691 02FE 4F                         CLRA
+0692 02FF 5F                         CLRB
+0693 0300 A7 80              DFL1    STA 0,X+
+0694 0302 5A                         DECB
+0695 0303 26 FB                      BNE DFL1
+0696                         *
+0697 0305 7F DE 1F                   CLR TRACK
+0698 0308 86 01                      LDA #1
+0699 030A B7 DE 20                   STA SECTOR
+0700 030D 8E DE 46           DFL2    LDX #BUFFER
+0701 0310 B6 DE 1F                   LDA TRACK
+0702 0313 A7 84                      STA 0,X
+0703 0315 B6 DE 20                   LDA SECTOR
+0704 0318 4C                         INCA
+0705 0319 81 0F                      CMPA #RMAXSEC+1 last sector on track?
+0706 031B 26 04                      BNE DFL3
+0707 031D 6C 84                      INC 0,X
+0708 031F 86 01                      LDA #1
+0709 0321 A7 01              DFL3    STA 1,X
+0710 0323 B6 DE 1F                   LDA TRACK
+0711 0326 F6 DE 20                   LDB SECTOR
+0712 0329 9D 5B                      JSR WRITSC
+0713 032B 7C DE 20                   INC SECTOR
+0714 032E B6 DE 20                   LDA SECTOR
+0715 0331 81 0F                      CMPA #RMAXSEC+1
+0716 0333 26 D8                      BNE DFL2
+0717 0335 86 01                      LDA #1
+0718 0337 B7 DE 20                   STA  SECTOR
+0719 033A 7C DE 1F                   INC TRACK
+0720 033D B6 DE 1F                   LDA TRACK
+0721 0340 81 40                      CMPA #RMAXTRK
+0722 0342 26 C9                      BNE DFL2
+0723                         * break free chain at last track/sector
+0724 0344 8E DE 46                   LDX  #BUFFER
+0725 0347 86 3F                      LDA  #RMAXTRK-1
+0726 0349 C6 0E                      LDB  #RMAXSEC
+0727 034B 9D 57                      JSR  READSC
+0728 034D 8E DE 46                   LDX  #BUFFER
+0729 0350 6F 84                      CLR  0,X
+0730 0352 6F 01                      CLR  1,X
+0731 0354 86 3F                      LDA  #RMAXTRK-1
+0732 0356 C6 0E                      LDB  #RMAXSEC
+0733 0358 9D 5B                      JSR  WRITSC 
+0734                         * set up sector structure, SIR, directory etc
+0735 035A 8E DE 46                   LDX  #BUFFER
+0736 035D 4F                         CLRA
+0737 035E C6 0E                      LDB  #RMAXSEC
+0738 0360 9D 57                      JSR  READSC
+0739 0362 8E DE 46                   LDX  #BUFFER
+0740 0365 6F 84                      CLR  0,X break end of directory chain
+0741 0367 6F 01                      CLR  1,X
+0742 0369 4F                         CLRA
+0743 036A C6 0E                      LDB  #RMAXSEC
+0744 036C 9D 5B                      JSR  WRITSC
+0745                         *
+0746 036E 8E DE 46                   LDX  #BUFFER
+0747 0371 4F                         CLRA
+0748 0372 C6 03                      LDB  #3 set up SIR
+0749 0374 9D 57                      JSR  READSC
+0750 0376 8E DE 46                   LDX  #BUFFER
+0751 0379 6F 84                      CLR  0,X break forward link
+0752 037B 6F 01                      CLR  1,X
+0753 037D CC 52 41                   LDD  #$5241 set volume name (RAMDISK )
+0754 0380 ED 88 10                   STD  16,X
+0755 0383 CC 4D 44                   LDD  #$4D44
+0756 0386 ED 88 12                   STD  18,X
+0757 0389 CC 49 53                   LDD  #$4953
+0758 038C ED 88 14                   STD  20,X
+0759 038F CC 4B 20                   LDD  #$4B20
+0760 0392 ED 88 16                   STD  22,X
+0761 0395 CC 00 01                   LDD  #1 volume number
+0762 0398 ED 88 1B                   STD  27,X
+0763 039B CC 01 01                   LDD  #$0101 first trk/sec  01-01
+0764 039E ED 88 1D                   STD  29,X
+0765 03A1 86 3F                      LDA  #RMAXTRK-1
+0766 03A3 C6 0E                      LDB  #RMAXSEC
+0767 03A5 ED 88 1F                   STD  31,X
+0768 03A8 ED 88 26                   STD  38,X
+0769 03AB CC 03 72                   LDD  #RTOTSEC total DATA sectors (2912-14)
+0770 03AE ED 88 21                   STD  33,X
+0771                         *
+0772 03B1 86 01                      LDA #01 month   set default creation date (SYS09's birthday!)
+0773 03B3 A7 88 23                   STA 35,X
+0774 03B6 86 07                      LDA #07 day
+0775 03B8 A7 88 24                   STA 36,X
+0776 03BB 86 07                      LDA #07 year
+0777 03BD A7 88 25                   STA 37,X
+0778                         *
+0779 03C0 4F                 RF3     CLRA
+0780 03C1 C6 03                      LDB  #3
+0781 03C3 9D 5B                      JSR  WRITSC
+0782                         *
+0783 03C5 8E DE 46                   LDX #BUFFER
+0784 03C8 4F                         CLRA
+0785 03C9 C6 01                      LDB #1
+0786 03CB 9D 57                      JSR READSC
+0787 03CD 8E DE 46                   LDX #BUFFER
+0788 03D0 86 AA                      LDA #$AA set the init flag
+0789 03D2 A7 84                      STA 0,X
+0790 03D4 86 55                      LDA  #$55
+0791 03D6 A7 01                      STA 1,X
+0792 03D8 4F                         CLRA
+0793 03D9 C6 01                      LDB #1
+0794 03DB 0E 5B                      JMP WRITSC
+0795                         *
+0796                         ********************************
+0797                         *    System specific Boot      *
+0798                         *    command goes here.        *
+0799                         ********************************
+0800                         *
+0801                         * Boot FLEX from the FPGA's internal pre-loaded scratch RAM
+0802                         *
+0803 03DD 08 08              UBMESS  FCB $08, $08
+0804 03DF 42 6F 6F 74 69 6E          FCC 'Booting internal FLEX....'
+          67 20 69 6E 74 65
+          72 6E 61 6C 20 46
+          4C 45 58 2E 2E 2E
+          2E
+0805 03F8 0D 0A 04                   FCB $0D,$0A,$04
+0806                         *
+0807 03FB 8E 03 DD           UBSUB   LDX #UBMESS
+0808 03FE BD 04 50                   JSR PDATA1
+0809                         *
+0810 0401 8E D3 E5                   LDX #$D3E5
+0811 0404 10 8E 04 24                LDY #CONTAB Overlay console driver table
+0812 0408 EC A1              UB1     LDD 0,Y++
+0813 040A ED 81                      STD 0,X++
+0814 040C 8C D3 FD                   CMPX #$D3FD
+0815 040F 26 F7                      BNE UB1
+0816                         *
+0817 0411 8E DE 00                   LDX #$DE00 Overlay disk driver table
+0818 0414 10 8E 04 3C                LDY #DISTAB
+0819 0418 EC A1              UB2     LDD 0,Y++
+0820 041A ED 81                      STD 0,X++
+0821 041C 8C DE 1E                   CMPX #$DE1E
+0822 041F 26 F7                      BNE UB2
+0823                         *
+0824 0421 7E CD 00           UBEND   JMP $CD00
+0825                         *
+0826                         * FLEX console jump table.
+0827 0424 04 5C              CONTAB  FDB INPNE       INPUT NO ECHO
+0828 0426 04 68                      FDB DUMMY       INTERRUPT HANDLER
+f9-monex.txt, line no. 829: Symbol undefined Pass 2
+0829 0428 00 02                      FDB MONRAM+$02 SWI VECTOR
+f9-monex.txt, line no. 830: Symbol undefined Pass 2
+0830 042A 00 08                      FDB MONRAM+$08 IRQ VECTOR
+0831 042C 04 68                      FDB DUMMY       TIMER OFF
+0832 042E 04 68                      FDB DUMMY       TIMER ON
+0833 0430 04 68                      FDB DUMMY       TIMER INITIALIZATION
+0834 0432 04 64                      FDB CONTRL      MONITOR
+0835 0434 04 68                      FDB DUMMY       TERMINAL INITIALIZATION
+0836 0436 04 60                      FDB STATUS      INPUT CHECK
+0837 0438 04 54                      FDB OUTP        TERMINAL OUTPUT
+0838 043A 04 58                      FDB INPE        TERMINAL INPUT WITH ECHO
+0839                         *
+0840                         * FLEX disk jump table.
+0841 043C 0E 57              DISTAB  JMP READSC
+0842 043E 0E 5B                      JMP WRITSC
+0843 0440 0E 5F                      JMP BUSY
+0844 0442 0E 63                      JMP RESTR1
+0845 0444 0E 6C                      JMP DRVSEL
+0846 0446 0E 9F                      JMP CHKRDY
+0847 0448 0E A3                      JMP CHKQIK
+0848 044A 0E A7                      JMP DINIT
+0849 044C 0E BF                      JMP DWARM
+0850 044E 0E C3                      JMP SEEKTS
+0851                         *
+0852                         * Monitor jumps
+0853                         *
+f9-monex.txt, line no. 854: Symbol undefined Pass 2
+0854 0450 6E 9F 00 00        PDATA1  JMP [PDATAV]
+f9-monex.txt, line no. 855: Symbol undefined Pass 2
+0855 0454 6E 9F 00 00        OUTP    JMP [OUTCHV]
+f9-monex.txt, line no. 856: Symbol undefined Pass 2
+0856 0458 6E 9F 00 00        INPE    JMP [INCHEV]
+f9-monex.txt, line no. 857: Symbol undefined Pass 2
+0857 045C 6E 9F 00 00        INPNE   JMP [INCHV]
+f9-monex.txt, line no. 858: Symbol undefined Pass 2
+0858 0460 6E 9F 00 00        STATUS  JMP [INCHKV]
+f9-monex.txt, line no. 859: Symbol undefined Pass 2
+0859 0464 6E 9F 00 00        CONTRL  JMP [MONITV]
+0860 0468 39                 DUMMY   RTS
+0861                         *
+0862                         ** 'UL' LOAD ROM DISK VIA SERIAL PORT
+0863                         *
+0864 0469 53 65 72 69 61 6C  ULMES   FCC  'Serial ROM Disk upload ...'
+          20 52 4F 4D 20 44
+          69 73 6B 20 75 70
+          6C 6F 61 64 20 2E
+          2E 2E
+0865 0483 0D 0A 04                   FCB  $0D,$0A,$04
+0866 0486 52 4F 4D 20 44 69  ULMES1  FCC  'ROM Disk Loaded'
+          73 6B 20 4C 6F 61
+          64 65 64
+0867 0495 0D 0A 04                   FCB  $0D,$0A,$04
+0868                         *
+0869 0498 8E 04 69           ULSUB   LDX  #ULMES
+0870 049B BD 04 50                   JSR  PDATA1
+0871                         *
+0872 049E 86 00                      LDA  #$00
+0873 04A0 B7 DE 1E                   STA  DRVNUM
+0874 04A3 4F                         CLRA         TRACK 0
+0875 04A4 C6 01                      LDB  #$01    SECTOR 1
+0876 04A6 B7 DE 1F           ULLOOP0 STA  TRACK
+0877 04A9 F7 DE 20                   STB  SECTOR`
+0878 04AC 17 FC 18                   LBSR MAPIN
+0879                         *
+0880 04AF 5F                         CLRB  xfer 256 bytes at a time.
+0881 04B0 BD 04 D3           ULLOOP1 JSR  LRBYTE transfer should be hex bytes
+0882 04B3 A7 C0                      STA  ,U+
+0883 04B5 5A                         DECB
+0884 04B6 26 F8                      BNE  ULLOOP1
+0885                         *
+0886 04B8 17 FC 3F                   LBSR MAPOUT
+0887                         *
+0888 04BB B6 DE 1F                   LDA  TRACK
+0889 04BE F6 DE 20                   LDB  SECTOR
+0890 04C1 5C                         INCB
+0891 04C2 C1 0F                      CMPB #EMAXSEC+1
+0892 04C4 26 E0                      BNE  ULLOOP0
+0893 04C6 C6 01                      LDB  #1
+0894 04C8 4C                         INCA
+0895 04C9 81 30                      CMPA #EMAXTRK
+0896 04CB 26 D9                      BNE  ULLOOP0
+0897                         *
+0898 04CD 8E 04 86           ULEXIT  LDX  #ULMES1
+0899 04D0 7E 04 50                   JMP  PDATA1
+0900                         *
+0901                         * Read a byte from the serial port
+0902                         *
+0903 04D3 34 04              LRBYTE  PSHS B
+0904 04D5 8D 0E                      BSR  LRHEX                  Get hex digit.
+0905 04D7 48                         ASLA
+0906 04D8 48                         ASLA                           Shift to msb.
+0907 04D9 48                         ASLA
+0908 04DA 48                         ASLA
+0909 04DB 1F 89                      TFR  A,B                    Save in B.
+0910 04DD 8D 06                      BSR  LRHEX                  Get next digit.
+0911 04DF 34 04                      PSHS B
+0912 04E1 AB E0                      ADDA 0,S+                    Add together bytes.
+0913 04E3 35 84                      PULS B,PC
+0914                         *
+0915 04E5 BD 05 0B           LRHEX   JSR  INTER
+0916 04E8 29 FB                      BVS  LRHEX
+0917 04EA 80 30                      SUBA #$30                   Remove ascii bias.
+0918 04EC 2B F7                      BMI  LRHEX
+0919 04EE 81 09                      CMPA #$09                   Number?
+0920 04F0 2F 0A                      BLE  LRHEX1                 Yes.
+0921 04F2 81 11                      CMPA #$11                   Keep testing.
+0922 04F4 2B EF                      BMI  LRHEX
+0923 04F6 81 16                      CMPA #$16
+0924 04F8 2E EB                      BGT  LRHEX
+0925 04FA 80 07                      SUBA #$07
+0926 04FC 39                 LRHEX1  RTS
+0927                         *
+0928                         * ACIA INPUT TEST
+0929                         *
+0930 04FD 96 00              INTEST  LDA ACIAC1
+0931 04FF 85 01                      BITA #$01
+0932 0501 39                         RTS
+0933                         *
+0934                         * RESET ACIA
+0935                         *
+0936 0502 86 03              ACIRST  LDA #$03 master reset
+0937 0504 97 00                      STA  ACIAC1
+0938 0506 86 11                      LDA #$11
+0939 0508 97 00                      STA ACIAC1
+0940 050A 39                         RTS
+0941                         *
+0942                         * ACIA INPUT
+0943                         *
+0944 050B 86 10              INTER   LDA  #16
+0945 050D B7 DE 27                   STA  DELCNT+0
+0946 0510 7F DE 28                   CLR  DELCNT+1
+0947 0513 7F DE 29                   CLR  DELCNT+2
+0948 0516 96 00              INTER0  LDA  ACIAC1
+0949 0518 85 01                      BITA #$01
+0950 051A 26 08                      BNE  INTER1
+0951 051C 85 78                      BITA #$78
+0952 051E 27 09                      BEQ  INTER2
+0953 0520 8D E0                      BSR  ACIRST
+0954 0522 20 E7                      BRA  INTER
+0955                         *
+0956 0524 96 01              INTER1  LDA  ACIAD1
+0957 0526 1C 02                      ANDCC #VFLAG
+0958 0528 39                         RTS
+0959                         *
+0960 0529 7A DE 29           INTER2  DEC  DELCNT+2
+0961 052C 26 E8                      BNE  INTER0
+0962 052E 7A DE 28                   DEC  DELCNT+1
+0963 0531 26 E3                      BNE  INTER0
+0964 0533 7A DE 27                   DEC  DELCNT+0
+0965 0536 26 DE                      BNE  INTER0
+0966 0538 4F                         CLRA
+0967 0539 1A 02                      ORCC #VFLAG
+0968 053B 39                         RTS
+0969                         *
+0970                         * ACIA OUTPUT
+0971                         *
+0972 053C 34 02              OUTTER  PSHS A
+0973                         *
+0974 053E 96 00              OUTTE1  LDA ACIAC1
+0975 0540 85 02                      BITA #$02
+0976 0542 26 08                      BNE  OUTTE2
+0977 0544 85 78                      BITA #$78
+0978 0546 27 F6                      BEQ  OUTTE1
+0979 0548 8D B8                      BSR  ACIRST
+0980 054A 20 F2                      BRA  OUTTE1
+0981                         *
+0982 054C 35 02              OUTTE2  PULS A
+0983 054E 97 01                      STA ACIAD1
+0984 0550 39                         RTS
+0985                         *
+0986                         ** 'UX' Xmodem ROM Disk upload
+0987                         *
+0988 0551 0D 0A              UXMES   FCB $0D,$0A
+0989 0553 58 6D 6F 64 65 6D          FCC 'Xmodem ROM Disk Upload'
+          20 52 4F 4D 20 44
+          69 73 6B 20 55 70
+          6C 6F 61 64
+0990 0569 04                         FCB 4
+0991 056A 0D 0A              UXMES1  FCB $0D,$0A
+0992 056C 55 70 6C 6F 61 64          FCC 'Upload Complete'
+          20 43 6F 6D 70 6C
+          65 74 65
+0993 057B 04                         FCB 4
+0994 057C 0D 0A              UXMES2  FCB $0D,$0A
+0995 057E 55 70 6C 6F 61 64          FCC 'Upload Error'
+          20 45 72 72 6F 72
+0996 058A 04                         FCB 4
+0997                         *
+0998 058B 8E 05 51           UXSUB   LDX #UXMES
+0999 058E 17 FE BF                   LBSR PDATA1
+1000                         *
+1001 0591 86 01                      LDA  #1
+1002 0593 B7 DE 23                   STA BLKNUM
+1003 0596 8E 05 F9                   LDX  #XSTSTR
+1004 0599 BF DE 25                   STX  XSTATE
+1005                         *
+1006 059C 86 00                      LDA  #$00
+1007 059E B7 DE 1E                   STA  DRVNUM
+1008 05A1 4F                         CLRA         TRACK 0
+1009 05A2 C6 01                      LDB  #$01    SECTOR 1
+1010 05A4 B7 DE 1F           UXLOOP0 STA  TRACK
+1011 05A7 F7 DE 20                   STB  SECTOR
+1012 05AA 17 FB 1A                   LBSR MAPIN
+1013                         *
+1014 05AD 5F                         CLRB       xfer 256 bytes at a time.
+1015 05AE 17 00 2B           UXLOOP1 LBSR XBYTE transfer should be hex bytes
+1016 05B1 25 20                      BCS  UXERR
+1017 05B3 A7 C0                      STA  ,U+
+1018 05B5 5A                         DECB
+1019 05B6 26 F6                      BNE  UXLOOP1
+1020                         *
+1021 05B8 17 FB 3F                   LBSR MAPOUT
+1022                         *
+1023 05BB B6 DE 1F                   LDA  TRACK
+1024 05BE F6 DE 20                   LDB  SECTOR
+1025 05C1 5C                         INCB
+1026 05C2 C1 0F                      CMPB #EMAXSEC+1
+1027 05C4 26 DE                      BNE  UXLOOP0
+1028 05C6 C6 01                      LDB  #1
+1029 05C8 4C                         INCA
+1030 05C9 81 30                      CMPA #EMAXTRK
+1031 05CB 26 D7                      BNE  UXLOOP0
+1032                         *
+1033 05CD 8E 05 6A           UXEXIT  LDX  #UXMES1
+1034 05D0 7E 04 50                   JMP  PDATA1
+1035                         *
+1036 05D3 17 FB 24           UXERR   LBSR MAPOUT
+1037 05D6 8E 05 7C                   LDX  #UXMES2
+1038 05D9 16 FE 74                   LBRA PDATA1
+1039                         *
+1040                         * Get a Byte using XModem protocol
+1041                         * Carry clear => no errors
+1042                         * Carry set   => errors
+1043                         *
+1044 05DC 34 10              XBYTE   PSHS X
+1045 05DE BE DE 25                   LDX  XSTATE
+1046                         *
+1047 05E1 17 FF 27           XBYTE0  LBSR INTER
+1048 05E4 28 0A                      BVC  XBYTE1
+1049 05E6 86 15                      LDA  #NAK
+1050 05E8 17 FF 51                   LBSR OUTTER
+1051 05EB 8E 05 F9                   LDX  #XSTSTR
+1052 05EE 20 F1                      BRA  XBYTE0
+1053                         *
+1054 05F0 AD 84              XBYTE1  JSR  ,X
+1055 05F2 26 ED                      BNE  XBYTE0
+1056 05F4 BF DE 25                   STX  XSTATE
+1057 05F7 35 90                      PULS X,PC
+1058                         *
+1059                         * START - LOOK FOR SOH (START OF HEADER) = $01
+1060                         *
+1061 05F9 81 01              XSTSTR  CMPA #SOH
+1062 05FB 26 06                      BNE  XSTSTR1
+1063 05FD 8E 06 19                   LDX  #XSTBLK
+1064 0600 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+1065 0602 39                         RTS
+1066                         *
+1067 0603 81 04              XSTSTR1 CMPA #EOT
+1068 0605 26 08                      BNE  XSTSTR2
+1069 0607 86 06                      LDA  #ACK
+1070 0609 17 FF 30                   LBSR OUTTER
+1071 060C 1A 05                      ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+1072 060E 39                         RTS
+1073                         *
+1074 060F 81 18              XSTSTR2 CMPA #CAN
+1075 0611 26 03                      BNE  XSTSTR3 
+1076 0613 1A 05                      ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+1077 0615 39                         RTS
+1078                         *
+1079 0616 1C FA              XSTSTR3 ANDCC #$FF-CFLAG-ZFLAG
+1080 0618 39                         RTS
+1081                         *
+1082                         * Got SOH
+1083                         * Now get block number
+1084                         *
+1085 0619 B1 DE 23           XSTBLK  CMPA BLKNUM
+1086 061C 26 06                      BNE  XSTBLKE
+1087 061E 8E 06 2F                   LDX  #XSTCOM
+1088 0621 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+1089 0623 39                         RTS
+1090                         *
+1091                         * Error in block number
+1092                         *
+1093 0624 86 15              XSTBLKE LDA  #NAK
+1094 0626 17 FF 13                   LBSR OUTTER
+1095 0629 8E 05 F9                   LDX  #XSTSTR
+1096 062C 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+1097 062E 39                         RTS
+1098                         *
+1099                         * Get complement of block number
+1100                         *
+1101 062F 43                 XSTCOM  COMA
+1102 0630 B1 DE 23                   CMPA BLKNUM
+1103 0633 26 EF                      BNE  XSTBLKE
+1104 0635 7F DE 21                   CLR  CHKSUM
+1105 0638 86 80                      LDA  #128
+1106 063A B7 DE 24                   STA  BYTCNT
+1107 063D 8E 06 43                   LDX  #XSTDAT
+1108 0640 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+1109 0642 39                         RTS
+1110                         *
+1111                         * Get data bytes
+1112                         *
+1113 0643 34 02              XSTDAT  PSHS A
+1114 0645 BB DE 21                   ADDA CHKSUM
+1115 0648 B7 DE 21                   STA  CHKSUM
+1116 064B 35 02                      PULS A
+1117 064D 7A DE 24                   DEC  BYTCNT
+1118 0650 26 03                      BNE  XSTDAT1
+1119 0652 8E 06 5A                   LDX  #XSTCHK
+1120 0655 1C FE              XSTDAT1 ANDCC #$FF-CFLAG No abort
+1121 0657 1A 04                      ORCC #ZFLAG      Valid data (exit)
+1122 0659 39                         RTS
+1123                         *
+1124                         * Byte count reached zero
+1125                         * Check checksum byte
+1126                         *
+1127 065A B1 DE 21           XSTCHK  CMPA CHKSUM
+1128 065D 26 07                      BNE  XSTCHK1 retry if wrong checksum
+1129                         *
+1130                         * Checksum OK ... 
+1131                         * increment block number
+1132                         * and send ACK
+1133                         *
+1134 065F 7C DE 23                   INC  BLKNUM
+1135 0662 86 06                      LDA  #ACK
+1136 0664 20 0D                      BRA  XSTCHK2
+1137                         *
+1138                         * Checksum Error detected ...
+1139                         * Reset Sector counter in ACCB to last 128 byte boundary
+1140                         * and send NAK
+1141                         *
+1142 0666 34 04              XSTCHK1 PSHS B
+1143 0668 1F 30                      TFR  U,D
+1144 066A 5A                         DECB
+1145 066B C4 80                      ANDB #128 
+1146 066D 1F 03                      TFR  D,U
+1147 066F 35 04                      PULS B
+1148 0671 86 15                      LDA  #NAK
+1149 0673 17 FE C6           XSTCHK2 LBSR OUTTER
+1150 0676 8E 05 F9                   LDX  #XSTSTR
+1151 0679 1C FA                      ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+1152 067B 39                         RTS
+1153                         *
+1154                         ** 'UP' Load ROMdisk via config PROM.
+1155                         *
+1156 067C 08 08              UPMES   FCB  $08,$08
+1157 067E 4C 6F 61 64 20 52          FCC  'Load ROM disk from config PROM.'
+          4F 4D 20 64 69 73
+          6B 20 66 72 6F 6D
+          20 63 6F 6E 66 69
+          67 20 50 52 4F 4D
+          2E
+1158 069D 04                         FCB  4
+1159 069E 46 6F 75 6E 64 20  UPMES1  FCC  'Found SYNC, loading data...'
+          53 59 4E 43 2C 20
+          6C 6F 61 64 69 6E
+          67 20 64 61 74 61
+          2E 2E 2E
+1160 06B9 0A 0D 04                   FCB  $0A,$0D,4
+1161 06BC 52 4F 4D 20 44 69  UPMES2  FCC  'ROM Disk Loaded.'
+          73 6B 20 4C 6F 61
+          64 65 64 2E
+1162 06CC 0A 0D 04                   FCB  $0A,$0D,4
+1163 06CF 52 4F 4D 20 44 69  UPMES3  FCC  'ROM Disk Not Found.'
+          73 6B 20 4E 6F 74
+          20 46 6F 75 6E 64
+          2E
+1164 06E2 0A 0D 04                   FCB  $0A,$0D,4
+1165                         *
+1166 06E5 8E 06 7C           UPSUB	LDX  #UPMES
+1167 06E8 BD 04 50                   JSR  PDATA1
+1168                         *
+1169 06EB 8D 5A                      BSR  UPRESET
+1170 06ED 10 8E 00 20                LDY  #$0020  Set up count for 2 MBit
+1171 06F1 8E 00 00                   LDX  #$0000
+1172 06F4 8D 6C              UPSUB1  BSR  UPBIT   Shift in bit
+1173 06F6 8D 7C                      BSR  UPSYNC  Test for Sync pattern`
+1174 06F8 27 15                      BEQ  UPSUB4  Skip if found
+1175 06FA 30 1F                      LEAX -1,X    Count Down inner loop
+1176 06FC 8C 00 00                   CMPX #$0000
+1177 06FF 26 F3                      BNE  UPSUB1   Branch if inner loop not complete
+1178 0701 31 1F                      LEAY -1,X    Count down outer loop
+1179 0703 10 8C 00 00                CMPY #$0000
+1180 0707 26 EB                      BNE  UPSUB1   Branch if outer loop not complete
+1181                         *
+1182 0709 8E 06 CF                   LDX  #UPMES3 2MBits scanned, no synch, report error
+1183 070C 7E 04 50                   JMP  PDATA1
+1184                         *
+1185 070F 8E 06 9E           UPSUB4  LDX  #UPMES1 Sync found, now load disk
+1186 0712 BD 04 50                   JSR  PDATA1
+1187                         *
+1188 0715 4F                         CLRA
+1189 0716 B7 DE 1E                   STA  DRVNUM   select Drive 0
+1190 0719 C6 01                      LDB  #$01
+1191 071B B7 DE 1F           UPSUB2  STA  TRACK   track 0
+1192 071E F7 DE 20                   STB  SECTOR  sector 1
+1193                         *
+1194 0721 17 F9 A3                   LBSR MAPIN   map in buffer
+1195 0724 5F                         CLRB         256 byte sector
+1196 0725 8D 67              UPSUB3  BSR  UPBYTE  read byte from prom
+1197 0727 A7 C0                      STA  ,U+     Store in buffer
+1198 0729 5A                         DECB
+1199 072A 26 F9                      BNE  UPSUB3  Loop until sector read`
+1200 072C 17 F9 CB                   LBSR MAPOUT  map out buffer
+1201                         * 
+1202 072F B6 DE 1F                   LDA  TRACK   Advance sector
+1203 0732 F6 DE 20                   LDB  SECTOR
+1204 0735 5C                         INCB
+1205 0736 C1 0F                      CMPB #EMAXSEC+1 Wrap on max sector count
+1206 0738 26 E1                      BNE  UPSUB2
+1207 073A C6 01                      LDB  #1
+1208 073C 4C                         INCA          Advance track
+1209 073D 81 30                      CMPA #EMAXTRK
+1210 073F 26 DA                      BNE  UPSUB2
+1211                         *
+1212 0741 8E 06 BC           UPEXIT  LDX  #UPMES2  Load complete, report message 
+1213 0744 7E 04 50                   JMP  PDATA1
+1214                         *
+1215                         * Reset Serial PROM
+1216                         *
+f9-monex.txt, line no. 1217: Symbol undefined Pass 2
+1217 0747 86 00              UPRESET LDA  #PRSTHI    Strobe the reset line
+f9-monex.txt, line no. 1218: Symbol undefined Pass 2
+1218 0749 97 00                      STA  PROMREG
+f9-monex.txt, line no. 1219: Symbol undefined Pass 2
+1219 074B 86 00                      LDA  #PRSTLO
+f9-monex.txt, line no. 1220: Symbol undefined Pass 2
+1220 074D 97 00                      STA  PROMREG
+1221 074F 8E 00 00                   LDX  #$0000     Delay a while`
+f9-monex.txt, line no. 1222: Phasing Error
+1222 0752 30 1F              UPRST1  LEAX -1,X
+1223 0754 8C 00 00                   CMPX #$0000
+1224 0757 26 FB                      BNE  UPRST1
+1225 0759 BF DF 46                   STX  SYNCREG+0  Clear Sync Shift Register
+1226 075C BF DF 48                   STX  SYNCREG+2
+1227 075F 39                         RTS
+1228                         *
+1229                         * Input 1 Bit From PROM
+1230                         *
+f9-monex.txt, line no. 1231: Phasing Error
+f9-monex.txt, line no. 1231: Symbol undefined Pass 2
+1231 0760 86 00              UPBIT   LDA  #PCLKHI
+f9-monex.txt, line no. 1232: Symbol undefined Pass 2
+1232 0762 97 00                      STA  PROMREG
+f9-monex.txt, line no. 1233: Symbol undefined Pass 2
+1233 0764 86 00                      LDA  #PCLKLO
+f9-monex.txt, line no. 1234: Symbol undefined Pass 2
+1234 0766 97 00                      STA  PROMREG
+f9-monex.txt, line no. 1235: Symbol undefined Pass 2
+1235 0768 96 00                      LDA  PROMREG
+1236 076A 44                         LSRA
+1237 076B 78 DF 49                   ASL  SYNCREG+3
+1238 076E 39                         RTS
+1239                         *
+1240                         * Test for 32 bit Sync Word
+1241                         *
+f9-monex.txt, line no. 1242: Phasing Error
+1242 076F 79 DF 48           UPSYNC  ROL  SYNCREG+2
+1243 0772 79 DF 47                   ROL  SYNCREG+1
+1244 0775 79 DF 46                   ROL  SYNCREG+0
+f9-monex.txt, line no. 1245: Symbol undefined Pass 2
+1245 0778 CC 00 00                   LDD  #SYNCLO
+1246 077B 10 B3 DF 48                CMPD SYNCREG+2
+1247 077F 26 0C                      BNE  UPSYNCX
+f9-monex.txt, line no. 1248: Symbol undefined Pass 2
+1248 0781 CC 00 00                   LDD  #SYNCHI
+1249 0784 10 B3 DF 46                CMPD SYNCREG+0
+f9-monex.txt, line no. 1250: Phasing Error
+1250 0788 39                 UPSYNCX RTS
+1251                         *
+1252                         * Input 1 Byte From PROM
+1253                         *
+f9-monex.txt, line no. 1254: Phasing Error
+1254 0789 34 04              UPBYTE  PSHS B
+1255 078B C6 08                      LDB  #8
+f9-monex.txt, line no. 1256: Phasing Error
+1256 078D 8D D3              UPBYTE1 BSR  UPBIT
+1257 078F 5A                         DECB
+1258 0790 26 00                      BNE  UPBYTE1
+1259 0792 B6 DF 49                   LDA  SYNCREG+3
+1260 0795 35 84                      PULS B,PC 
+1261                         * 
+1262                         ***** NEXTCMD ***** 
+1263                         * 
+f9-monex.txt, line no. 1264: Phasing Error
+1264 0797 17 FC BE           NEXTEXT LBSR INPE  GET ONE CHAR. FROM TERMINAL 
+1265 079A 84 7F                      ANDA #$7F STRIP PARITY FROM CHAR. 
+1266 079C 1F 89                      TFR  A,B
+1267 079E 86 20                      LDA  #$20 
+1268 07A0 17 FC B1                   LBSR OUTP PRNT SPACE 
+1269 07A3 C1 60                      CMPB #$60 
+1270 07A5 2F 07                      BLE NXTEX0 
+1271 07A7 C0 20                      SUBB #$20 
+1272                         * 
+1273                         ***** DO TABLE LOOKUP ***** 
+1274                         *   FOR COMMAND FUNCTIONS 
+1275                         * 
+f9-monex.txt, line no. 1276: Phasing Error
+1276 07A9 8E 07 C4           NXTEX0  LDX #EXTTAB    POINT TO JUMP TABLE 
+f9-monex.txt, line no. 1277: Phasing Error
+1277 07AC E1 80              NXTEX1  CMPB ,X+       DOES COMMAND MATCH TABLE ENTRY ? 
+1278 07AE 27 12                      BEQ  JMPEXT    BRANCH IF MATCH FOUND 
+1279 07B0 30 02                      LEAX 2,X       POINT TO NEXT ENTRY IN TABLE 
+1280 07B2 8C 07 D3                   CMPX #EXTEND   REACHED END OF TABLE YET ? 
+1281 07B5 26 FA                      BNE  NXTEX1    IF NOT END, CHECK NEXT ENTRY 
+1282 07B7 8E 07 D3                   LDX  #MSGWHAT  POINT TO MSG "WHAT?" 
+1283 07BA 16 FC 93                   LBRA PDATA1    PRINT MSG AND RETURN
+f9-monex.txt, line no. 1284: Phasing Error
+1284 07BD 6E 94              JMPEXT  JMP  [,X]      JUMP TO COMMAND ROUTINE 
+1285                         *
+1286                         * EXTENDED COMMAND JUMP TABLE 
+1287                         * 
+f9-monex.txt, line no. 1288: Phasing Error
+1288 07BF                    EXTTAB EQU * 
+1289 07BF 42                        FCC 'B'   BOOT FLEX
+1290 07C0 03 FB                     FDB UBSUB
+1291 07C2 4C                        FCC 'L'   LOAD ROM DISK OVER SERIAL PORT
+1292 07C3 04 98                     FDB ULSUB 
+1293 07C5 46                        FCC 'F'   FORMAT RAM DISK
+1294 07C6 02 D7                     FDB UFSUB 
+1295 07C8 50                        FCC 'P'   LOAD ROM DISK FROM PROM
+1296 07C9 06 E5                     FDB UPSUB 
+1297 07CB 58                        FCC 'X'   XMODEM ROM DISK UPLOAD
+1298 07CC 05 8B                     FDB UXSUB
+1299                         * 
+f9-monex.txt, line no. 1300: Phasing Error
+1300 07CE                    EXTEND EQU * 
+1301                         *
+f9-monex.txt, line no. 1302: Phasing Error
+1302 07CE 57 48 41 54 20 3F  MSGWHAT FCC "WHAT ?"
+1303 07D4 0A 0D 04                   FCB $0A,$0D,$04
+1304                                END
+Program + Init Data = 2047 bytes
+Error count = 68

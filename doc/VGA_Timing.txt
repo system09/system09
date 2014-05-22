@@ -1,0 +1,27 @@
+"VGA industry standard"
+Clock frequency 25.175 MHz
+Line  frequency 31469 Hz
+Field frequency 59.94 Hz
+
+One line:
+  8 pixels front porch
+ 96 pixels horizontal sync
+ 40 pixels back porch
+  8 pixels left border
+640 pixels video
+  8 pixels right border
+---
+800 pixels total per line
+
+One field:
+  2 lines front porch
+  2 lines vertical sync
+ 25 lines back porch
+  8 lines top border
+480 lines video
+  8 lines bottom border
+---
+525 lines total per field
+
+Sync polarity: H negative, V negative
+Scan type: non interlaced. 

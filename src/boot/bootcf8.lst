@@ -1,0 +1,198 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         *******************************************************
+0002                         *
+0003                         * Bootstrap FLEX Loader
+0004                         *
+0005                         * SBUG1.8 loads the bootstap loader at $C000
+0006                         * however the Flex adaption manual has the
+0007                         * bootstrap loader residing at $C100
+0008                         *
+0009                         ******************************************************
+0010                         *
+0011                         * Equates
+0012                         *
+0013 C0FF                    STACK   EQU $C0FF
+0014 C300                    SCTBUF  EQU $C300
+0015                         *
+0016                         * Start of Utility
+0017                         *
+0018 C000                            ORG $C000
+0019 C000 20 0B              BOOT    BRA LOAD0
+0020 C002 00 00 00                   FCB 0,0,0
+0021 C005 00                 TRK     FCB 0        File start track
+0022 C006 00                 SCT     FCB 0        File start sector
+0023 C007 00                 DNS     FCB 0        Density Flag (not used)
+0024 C008 C0 00              TADR    FDB $C000    Transfer address
+0025 C00A 00 00              LADR    FDB 0        Load Address
+0026 C00C 00                 DRVNUM  FCB 0        Drive number 0
+0027                         *
+0028 C00D 10 CE C0 FF        LOAD0   LDS  #STACK   Set up stack
+0029 C011 FC C0 05                   LDD  TRK      Set up start track and sector
+0030 C014 FD C3 00                   STD  SCTBUF
+0031 C017 10 8E C4 00                LDY  #SCTBUF+256
+0032                         *
+0033                         * Perform actual file load
+0034                         *
+0035 C01B 8D 35              LOAD1   BSR GETCH    Get acharcater
+0036 C01D 81 02                      CMPA #$02    Data record hearder ?
+0037 C01F 27 10                      BEQ  LOAD2   Skip, is so
+0038 C021 81 16                      CMPA #$16    Xfr address hearder ?
+0039 C023 26 F6                      BNE LOAD1    Loop if neither
+0040                         *
+0041                         * Get transfer address
+0042                         *
+0043 C025 8D 2B                      BSR  GETCH
+0044 C027 B7 C0 08                   STA  TADR
+0045 C02A 8D 26                      BSR  GETCH
+0046 C02C B7 C0 09                   STA  TADR+1
+0047 C02F 20 EA                      BRA  LOAD1
+0048                         *
+0049                         * Load data record
+0050                         *
+0051 C031 8D 1F              LOAD2  BSR  GETCH  Get load address
+0052 C033 B7 C0 0A                  STA  LADR
+0053 C036 8D 1A                     BSR  GETCH
+0054 C038 B7 C0 0B                  STA  LADR+1
+0055 C03B 8D 15                     BSR  GETCH  Get Bytes count
+0056 C03D 1F 89                     TFR  A,B
+0057 C03F 5D                        TSTB
+0058 C040 27 D9                     BEQ  LOAD1 Loop if count = 0
+0059 C042 BE C0 0A                  LDX  LADR  Get load address
+0060 C045 34 14              LOAD3  PSHS B,X
+0061 C047 8D 09                     BSR  GETCH  Get data character
+0062 C049 35 14                     PULS B,X
+0063 C04B A7 80                     STA  ,X+    Store at load address
+0064 C04D 5A                        DECB
+0065 C04E 26 F5                     BNE  LOAD3  Loop until count = 0
+0066 C050 20 C9                     BRA  LOAD1
+0067                         *
+0068                         * Get Character routine
+0069                         * Reads a sector if needed
+0070                         *
+0071 C052 10 8C C4 00        GETCH  CMPY #SCTBUF+256 out of data ?
+0072 C056 26 0F                     BNE  GETCH4      Go read Character if not
+0073 C058 8E C3 00           GETCH2 LDX  #SCTBUF     Point to buffer
+0074 C05B EC 84                     LDD  0,X         Get forward Link
+0075 C05D 27 0B                     BEQ  GO          if zero, file is loaded
+0076 C05F 8D 27                     BSR  READ        Read next sector
+0077 C061 26 9D                     BNE  BOOT        start over if error
+0078 C063 10 8E C3 04               LDY  #SCTBUF+4   Point past link
+0079 C067 A6 A0              GETCH4 LDA  ,Y+         Else, get a character
+0080 C069 39                        RTS
+0081                         *
+0082                         * File is loaded, Jump to it
+0083                         *
+0084 C06A 6E 9F C0 08        GO     JMP  [TADR]      Jump to transfer address
+0085                         
+0086                         *
+0087                         ** FLEX 9 COMPACT FLASH DISK DRIVERS
+0088                         *
+0089                         * FOR SYS09BUG 1.2 ON THE BURCHED B5-X300
+0090                         * WITH I/O MAPPED AT $XE000
+0091                         * AND ROM MAPPED AT $XF000
+0092                         * THE BURCHED B5-X300 HAS 256KBYTES OF SRAM
+0093                         * THE FIRST 64K IS USED BY FLEX,
+0094                         * THE SECOND 192K MAY BE USED AS A RAM DISK
+0095                         *
+0096                         *
+0097 0010                    IMASK  EQU $10     IRQ MASK CC
+0098 0040                    FMASK  EQU $40     FIRQ MASK CC
+0099 FFF0                    DATREG EQU $FFF0   DAT REGISTERS
+0100                         *
+0101 E040                    CF_BASE    EQU $E040
+0102 E040                    CF_DATA    EQU CF_BASE+0
+0103 E041                    CF_ERROR   EQU CF_BASE+1 ; read error
+0104 E041                    CF_FEATURE EQU CF_BASE+1 ; write feature
+0105 E042                    CF_SECCNT  EQU CF_BASE+2
+0106 E043                    CF_SECNUM  EQU CF_BASE+3
+0107 E044                    CF_CYLLO   EQU CF_BASE+4
+0108 E045                    CF_CYLHI   EQU CF_BASE+5
+0109 E046                    CF_HEAD    EQU CF_BASE+6
+0110 E047                    CF_STATUS  EQU CF_BASE+7 ; read status
+0111 E047                    CF_COMAND  EQU CF_BASE+7 ; write command
+0112                         *
+0113                         * Command Equates
+0114                         *
+0115 0020                    CMDREAD    EQU $20 ; Read Single sector
+0116 0030                    CMDWRITE   EQU $30 ; Write Single sector
+0117 00EF                    CMDFEATURE EQU $EF
+0118 0001                    FEAT8BIT   EQU $01 ; enable 8 bit transfers
+0119 00E0                    HEADLBA    EQU $E0
+0120                         *
+0121                         * Status bit equates
+0122                         *
+0123 0080                    BSY        EQU $80
+0124 0040                    DRDY       EQU $40
+0125 0008                    DRQ        EQU $08
+0126 0001                    ERR        EQU $01
+0127                         *  
+0128                         * RESTORE DISK DRIVER (SEEK TRACK 00)
+0129                         *  
+0130 C06E 7F C0 0C           RESTR1 CLR  DRVNUM
+0131 C071 4F                        CLRA           ; Track 0
+0132 C072 C6 01                     LDB  #$01     ; Sector 1
+0133                         *
+0134                         * Seek track and sector
+0135                         * A holds track number (0 - ??)
+0136                         * B holds sector number (1 - ??)
+0137                         * Sector numbers starts from 1
+0138                         * subtract 1 to start from sector 0 on CF
+0139                         *
+0140 C074 5A                 SEEKTS DECB
+0141 C075 F7 E0 43                  STB  CF_SECNUM
+0142 C078 B7 E0 44                  STA  CF_CYLLO
+0143 C07B F6 C0 0C                  LDB  DRVNUM
+0144 C07E F7 E0 45                  STB  CF_CYLHI
+0145 C081 C6 01                     LDB  #$01
+0146 C083 F7 E0 42                  STB  CF_SECCNT
+0147 C086 5F                        CLRB
+0148 C087 39                 WARMD1 RTS
+0149                         *
+0150                         * READ SECTORS FROM CF
+0151                         *
+0152                         *
+0153 C088 8D EA              READ   BSR  SEEKTS
+0154 C08A 86 20                     LDA  #CMDREAD ; IDE READ MULTIPLE
+0155 C08C B7 E0 47                  STA  CF_COMAND
+0156 C08F 8D 18                     BSR  WAITRDY
+0157                         *
+0158                         * READ LOOP
+0159                         *
+0160 C091 5F                        CLRB
+0161 C092 8D 24              RDLP1  BSR  WAITDRQ
+0162 C094 B6 E0 40                  LDA  CF_DATA
+0163 C097 A7 80                     STA  ,X+
+0164 C099 5A                        DECB
+0165 C09A 26 F6                     BNE  RDLP1
+0166                         *
+0167 C09C 5F                        CLRB
+0168 C09D 8D 19              RDLP2  BSR  WAITDRQ
+0169 C09F B6 E0 40                  LDA  CF_DATA
+0170 C0A2 5A                        DECB
+0171 C0A3 26 F8                     BNE  RDLP2
+0172                         *
+0173 C0A5 8D 02                     BSR  WAITRDY
+0174 C0A7 5F                        CLRB
+0175 C0A8 39                        RTS
+0176                         *
+0177                         * WAIT UNTIL READY
+0178                         *
+0179 C0A9 B6 E0 47           WAITRDY LDA  CF_STATUS
+0180 C0AC 85 80                      BITA #BSY
+0181 C0AE 26 F9                      BNE  WAITRDY
+0182 C0B0 B6 E0 47                   LDA  CF_STATUS
+0183 C0B3 85 40                      BITA #DRDY
+0184 C0B5 27 F2                      BEQ  WAITRDY
+0185 C0B7 39                         RTS
+0186                         *
+0187                         * WAIT FOR DATA REQUEST
+0188                         *
+0189 C0B8 B6 E0 47           WAITDRQ LDA  CF_STATUS
+0190 C0BB 85 08                      BITA #DRQ
+0191 C0BD 27 F9                      BEQ  WAITDRQ
+0192 C0BF 39                         RTS
+0193                         *
+0194                                 END
+Program + Init Data = 192 bytes
+Error count = 0

@@ -1,0 +1,871 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         *  6809 Debug monitor for use with NOICE09
+0002                         *
+0003                         *  Copyright (c) 1992-2006 by John Hartman
+0004                         *
+0005                         *  Modification History:
+0006                         *	14-Jun-93 JLH release version
+0007                         *	24-Aug-93 JLH bad constant for COMBUF length compare
+0008                         *	25-Feb-98 JLH assemble with either Motorola or Dunfield
+0009                         *	 1-May-06 JLH slight cleanup
+0010                         *	 4-Jul-06 JEK Modified for System09 ACIA at $E000/$E001
+0011                         *                     2K monitor RAM at $F000 - $F7FF
+0012                         *                     Allocated 1536 bytes ($600) for user stack.
+0013                         *                     disables watchdog timer
+0014                         *
+0015                         *============================================================================
+0016                         *
+0017                         *  To customize for a given target, you must change code in the
+0018                         *  hardware equates, the string TSTG, and the routines RESET and REWDT.
+0019                         *  You may or may not need to change GETCHAR, PUTCHAR, depending on
+0020                         *  how peculiar your UART is.
+0021                         *
+0022                         *  This file has been assembled with the Motorola Freeware assembler
+0023                         *  available from the Motorola Freeware BBS and elsewhere.
+0024                         *   BUT:  you must first "comment out" the conditionals as required,
+0025                         *   because the Motorola assemblers do not have any IFEQ/ELSE/ENDIF
+0026                         *
+0027                         *  This file may also be assembled with the Dunfield assembler
+0028                         *
+0029                         *  To add mapped memory support:
+0030                         *       1) Define map port MAPREG here
+0031                         *       2) Define or import map port RAM image MAPIMG here if MAPREG is
+0032                         *          write only.  (The application code must update MAPIMG before
+0033                         *          outputing to MAPREG)
+0034                         *       3) Search for and modify MAPREG, MAPIMG, and REG_PAGE usage below
+0035                         *       4) In TSTG below edit "LOW AND HIGH LIMIT OF MAPPED MEM"
+0036                         *          to appropriate range (typically 4000H to 07FFFH for two-bit MMU)
+0037                         *
+0038                         *============================================================================
+0039                         *
+0040                         *  I/O equates for Heng's ROM emulator (set true if used)
+0041                         ***ROMEM   SET     1
+0042                         *
+0043                         *============================================================================
+0044                         *  HARDWARE PLATFORM CUSTOMIZATIONS
+0045                         *
+0046                         *RAM_START       EQU     $D800           START OF MONITOR RAM
+0047 F000                    RAM_START       EQU     $F000           START OF MONITOR RAM
+0048 FC00                    ROM_START       EQU     $FC00           START OF MONITOR CODE
+0049 FFF0                    HARD_VECT       EQU     $FFF0           START OF HARDWARE VECTORS
+0050                         
+0051                         *============================================================================
+0052                         *  Equates for memory mapped 16450 serial port on Heng's ROM emulator board
+0053                         *;*        IFEQ ROMEM,1
+0054                         *
+0055                         *S16450  equ     $A000           base of 16450 UART
+0056                         *RXR     equ     0                 Receiver buffer register
+0057                         *TXR     equ     0                 Transmitter buffer register
+0058                         *IER     equ     1                 Interrupt enable register
+0059                         *LCR     equ     3                 Line control register
+0060                         *MCR     equ     4                 Modem control register
+0061                         *DTR     equ     1                 Bit equate used to control status LED
+0062                         *LSR     equ     5                 Line status register
+0063                         *
+0064                         *  Define monitor serial port
+0065                         *SER_STATUS      EQU     S16450+LSR
+0066                         *SER_RXDATA      EQU     S16450+RXR
+0067                         *SER_TXDATA      EQU     S16450+TXR
+0068                         *RXRDY           EQU     $01              BIT MASK FOR RX BUFFER FULL
+0069                         *TXRDY           EQU     $20              BIT MASK FOR TX BUFFER EMPTY
+0070                         *;*        ELSE
+0071                         *
+0072                         *  Put you UART equates here
+0073 E000                    SER_STATUS      EQU     $E000
+0074 E001                    SER_RXDATA      EQU     $E001
+0075 E001                    SER_TXDATA      EQU     $E001
+0076 0001                    RXRDY           EQU     $01
+0077 0002                    TXRDY           EQU     $02
+0078                         *
+0079                         *;*        ENDIF
+0080                         *
+0081                         *  Watchdog timer (if any)  See REWDT for use
+0082                         *WDT             EQU     $207
+0083                         *
+0084                         *  Condition code bits
+0085 0001                    C       EQU     1
+0086 000A                    I       EQU     10H
+0087 0028                    F       EQU     40H
+0088 0050                    E       EQU     80H
+0089                         *
+0090                         *============================================================================
+0091                         *  RAM definitions:
+0092 F000                            ORG     RAM_START
+0093                         *
+0094                         *  RAM interrupt vectors (first in SEG for easy addressing, else move to
+0095                         *  their own SEG)
+0096 0008                    NVEC            EQU     8               number of vectors
+0097 F000                    RAMVEC          RMB     2*NVEC
+0098                         *
+0099                         *  Initial user stack
+0100                         *  (Size and location is user option)
+0101                         *                RMB     64
+0102 F010                                    RMB     $600
+0103                         INITSTACK
+0104                         *
+0105                         *  Monitor stack
+0106                         *  (Calculated use is at most 7 bytes.  Leave plenty of spare)
+0107 F610                                    RMB     16
+0108                         MONSTACK
+0109                         *
+0110                         *  Target registers:  order must match that in TRGHC11.C
+0111                         TASK_REGS
+0112 F620                    REG_STATE       RMB     1
+0113 F621                    REG_PAGE        RMB     1
+0114 F622                    REG_SP          RMB     2
+0115 F624                    REG_U           RMB     2
+0116 F626                    REG_Y           RMB     2
+0117 F628                    REG_X           RMB     2
+0118 F62A                    REG_B           RMB     1               B BEFORE A, SO D IS LEAST SIG. FIRST
+0119 F62B                    REG_A           RMB     1
+0120 F62C                    REG_DP          RMB     1
+0121 F62D                    REG_CC          RMB     1
+0122 F62E                    REG_PC          RMB     2
+0123 0010                    TASK_REG_SZ     EQU     *-TASK_REGS
+0124                         *
+0125                         *  Communications buffer
+0126                         *  (Must be at least as long as TASK_REG_SZ.  At least 19 bytes recommended.
+0127                         *  Larger values may improve speed of NoICE memory move commands.)
+0128 0080                    COMBUF_SIZE     EQU     128             DATA SIZE FOR COMM BUFFER
+0129 F630                    COMBUF          RMB     2+COMBUF_SIZE+1 BUFFER ALSO HAS FN, LEN, AND CHECK
+0130                         *
+0131 F6B3                    RAM_END         EQU     *               ADDRESS OF TOP+1 OF RAM
+0132                         *
+0133                         *===========================================================================
+0134 FC00                            ORG     ROM_START
+0135                         *
+0136                         *  Power on reset
+0137                         RESET
+0138                         *
+0139                         *  Set CPU mode to safe state
+0140 FC00 1A 32                      ORCC    #I+F            INTERRUPTS OFF
+0141 FC02 10 CE F6 20                LDS     #MONSTACK       CLEAN STACK IS HAPPY STACK
+0142                         *
+0143                         *----------------------------------------------------------------------------
+0144                         *;*        IFEQ ROMEM,1
+0145                         *
+0146                         *  Initialize S16450 UART on ROM emulator
+0147                         *
+0148                         *  Delay here in case the UART has not come out of reset yet.
+0149 FC06 8E 00 00                   LDX     #0
+0150 FC09 30 1F              LOP     LEAX    -1,X                    DELAY FOR SLOW RESETTING UART
+0151 FC0B 12                         NOP
+0152 FC0C 12                         NOP
+0153 FC0D 26 FA                      BNE     LOP
+0154                         *
+0155                         *  access baud generator, no parity, 1 stop bit, 8 data bits
+0156                         *        LDA     #$83
+0157                         *        STA     S16450+LCR
+0158                         *
+0159                         *  fixed baud rate of 19200:  crystal is 3.686400 Mhz.
+0160                         *  Divisor is 3,686400/(16*baud)
+0161                         *        LDA     #12                     fix at 19.2 kbaud
+0162                         *        STA     S16450+RXR              lsb
+0163                         *        LDA     #0
+0164                         *        STA     S16450+RXR+1            msb=0
+0165                         *
+0166                         *  access data registers, no parity, 1 stop bits, 8 data bits
+0167                         *        LDA     #$03
+0168                         *        STA     S16450+LCR
+0169                         *
+0170                         *  no loopback, OUT2 on, OUT1 on, RTS on, DTR (LED) on
+0171                         *        LDA     #$0F
+0172                         *        STA     S16450+MCR
+0173                         *
+0174                         *  disable all interrupts: modem, receive error, transmit, and receive
+0175                         *        LDA     #$00
+0176                         *        STA     S16450+IER
+0177                         *
+0178                         *;*        ELSE
+0179                         *
+0180                         *  Initialize your UART here
+0181 FC0F 86 03              	LDA	#$03			Reset ACIA
+0182 FC11 B7 E0 00           	STA	SER_STATUS
+0183 FC14 86 11              	LDA	#$11			8 data 2 stop no parity 
+0184 FC16 B7 E0 00           	STA	SER_STATUS
+0185 FC19 7D E0 01           	TST	SER_RXDATA
+0186                         *;*        ENDIF
+0187                         *
+0188                         *----------------------------------------------------------------------------
+0189                         *
+0190                         *  Initialize RAM interrupt vectors
+0191 FC1C 10 8E FC AC                LDY     #INT_ENTRY      ADDRESS OF DEFAULT HANDLER
+0192 FC20 8E F0 00                   LDX     #RAMVEC         POINTER TO RAM VECTORS
+0193 FC23 C6 08                      LDB     #NVEC           NUMBER OF VECTORS
+0194 FC25 10 AF 81           RES10   STY     ,X++            SET VECTOR
+0195 FC28 5A                         DECB
+0196 FC29 26 FA                      BNE     RES10
+0197                         *
+0198                         *  Initialize user registers
+0199 FC2B CC F6 10                   LDD     #INITSTACK
+0200 FC2E B7 F6 23                   STA     REG_SP+1                INIT USER'S STACK POINTER MSB
+0201 FC31 F7 F6 22                   STB     REG_SP                  LSB
+0202                         *
+0203 FC34 CC 00 00                   LDD     #0
+0204 FC37 FD F6 2E                   STD     REG_PC
+0205 FC3A B7 F6 2B                   STA     REG_A
+0206 FC3D B7 F6 2A                   STA     REG_B
+0207 FC40 B7 F6 2C                   STA     REG_DP
+0208 FC43 FD F6 28                   STD     REG_X
+0209 FC46 FD F6 26                   STD     REG_Y
+0210 FC49 FD F6 24                   STD     REG_U
+0211 FC4C B7 F6 20                   STA     REG_STATE               initial state is "RESET"
+0212                         *
+0213                         *  Initialize memory paging variables and hardware (if any)
+0214 FC4F B7 F6 21                   STA     REG_PAGE                initial page is zero
+0215                         *;;;    STA     MAPIMG
+0216                         *;;;    STA     MAPREG                  set hardware map
+0217                         *
+0218 FC52 86 82                      LDA     #E+I+F                  state "all regs pushed", no ints
+0219 FC54 B7 F6 2D                   STA     REG_CC
+0220                         *
+0221                         *  Set function code for "GO".  Then if we reset after being told to
+0222                         *  GO, we will come back with registers so user can see the crash
+0223 FC57 86 FA                      LDA     #FN_RUN_TARG
+0224 FC59 B7 F6 30                   STA     COMBUF
+0225 FC5C 7E FD D1                   JMP     RETURN_REGS             DUMP REGS, ENTER MONITOR
+0226                         *
+0227                         *===========================================================================
+0228                         *  Get a character to A
+0229                         *
+0230                         *  Return A=char, CY=0 if data received
+0231                         *         CY=1 if timeout (0.5 seconds)
+0232                         *
+0233                         *  Uses 6 bytes of stack including return address
+0234                         *
+0235                         GETCHAR
+0236 FC5F 34 10                      PSHS    X
+0237 FC61 8E 00 00                   LDX     #0              LONG TIMEOUT
+0238 FC64 BD FC 8E           GC10    JSR     REWDT           PREVENT WATCHDOG TIMEOUT
+0239 FC67 30 1F                      LEAX    -1,X
+0240 FC69 27 0D                      BEQ     GC90            EXIT IF TIMEOUT
+0241 FC6B B6 E0 00                   LDA     SER_STATUS      READ DEVICE STATUS
+0242 FC6E 84 01                      ANDA    #RXRDY
+0243 FC70 27 F2                      BEQ     GC10            NOT READY YET.
+0244                         *
+0245                         *  Data received:  return CY=0. data in A
+0246 FC72 4F                         CLRA                    CY=0
+0247 FC73 B6 E0 01                   LDA     SER_RXDATA      READ DATA
+0248 FC76 35 90                      PULS    X,PC
+0249                         *
+0250                         *  Timeout:  return CY=1
+0251 FC78 1A 01              GC90    ORCC    #C              CY=1
+0252 FC7A 35 90                      PULS    X,PC
+0253                         *
+0254                         *===========================================================================
+0255                         *  Output character in A
+0256                         *
+0257                         *  Uses 5 bytes of stack including return address
+0258                         *
+0259                         PUTCHAR
+0260 FC7C 34 02                      PSHS    A
+0261 FC7E BD FC 8E           PC10    JSR     REWDT           PREVENT WATCHDOG TIMEOUT
+0262 FC81 B6 E0 00                   LDA     SER_STATUS      CHECK TX STATUS
+0263 FC84 84 02                      ANDA    #TXRDY          RX READY ?
+0264 FC86 27 F6                      BEQ     PC10
+0265 FC88 35 02                      PULS    A
+0266 FC8A B7 E0 01                   STA     SER_TXDATA      TRANSMIT CHAR.
+0267 FC8D 39                         RTS
+0268                         *
+0269                         *======================================================================
+0270                         *
+0271                         *  RESET WATCHDOG TIMER.  MUST BE CALLED AT LEAST ONCE EVERY LITTLE WHILE
+0272                         *  OR COP INTERRUPT WILL OCCUR
+0273                         *
+0274                         *  Uses 2 bytes of stack including return address
+0275                         *
+0276 FC8E 4F                 REWDT   CLRA
+0277                         *        STA     WDT
+0278 FC8F 4C                         INCA
+0279                         *        STA     WDT             CU-style WDT:  must leave bit high
+0280 FC90 39                         RTS
+0281                         *
+0282                         *======================================================================
+0283                         *  Response string for GET TARGET STATUS request
+0284                         *  Reply describes target:
+0285 FC91 05                 TSTG    FCB     5                       2: PROCESSOR TYPE = 6809
+0286 FC92 80                         FCB     COMBUF_SIZE             3: SIZE OF COMMUNICATIONS BUFFER
+0287 FC93 00                         FCB     0                       4: NO TASKING SUPPORT
+0288 FC94 00 00 00 00                FDB     0,0                     5-8: LOW AND HIGH LIMIT OF MAPPED MEM (NONE)
+0289 FC98 01                         FCB     B1-B0                   9:  BREAKPOINT INSTR LENGTH
+0290 FC99 3F                 B0      SWI                             10: BREAKPOINT INSTRUCTION
+0291 FC9A 36 38 30 39 20 6D  B1      FCC     '6809 monitor V1.0'     DESCRIPTION, ZERO
+          6F 6E 69 74 6F 72
+          20 56 31 2E 30
+0292 FCAB 00                         FCB     0
+0293 001B                    TSTG_SIZE       EQU     *-TSTG          SIZE OF STRING
+0294                         *
+0295                         *======================================================================
+0296                         *  HARDWARE PLATFORM INDEPENDENT EQUATES AND CODE
+0297                         *
+0298                         *  Communications function codes.
+0299 00FF                    FN_GET_STAT     EQU     $FF    reply with device info
+0300 00FE                    FN_READ_MEM     EQU     $FE    reply with data
+0301 00FD                    FN_WRITE_M      EQU     $FD    reply with status (+/-)
+0302 00FC                    FN_READ_RG      EQU     $FC    reply with registers
+0303 00FB                    FN_WRITE_RG     EQU     $FB    reply with status
+0304 00FA                    FN_RUN_TARG     EQU     $FA    reply (delayed) with registers
+0305 00F9                    FN_SET_BYTE     EQU     $F9    reply with data (truncate if error)
+0306 00F8                    FN_IN           EQU     $F8    input from port
+0307 00F7                    FN_OUT          EQU     $F7    output to port
+0308                         *
+0309 00F7                    FN_MIN          EQU     $F7    MINIMUM RECOGNIZED FUNCTION CODE
+0310 00F0                    FN_ERROR        EQU     $F0    error reply to unknown op-code
+0311                         *
+0312                         *===========================================================================
+0313                         *  Common handler for default interrupt handlers
+0314                         *  Enter with A=interrupt code = processor state
+0315                         *  All registers stacked, PC=next instruction
+0316                         INT_ENTRY
+0317 FCAC B7 F6 20                   STA     REG_STATE       SAVE STATE
+0318                         *
+0319                         *  Save registers from stack to reg block for return to master
+0320                         *  Host wants least significant bytes first, so flip as necessary
+0321 FCAF 35 02                      PULS    A
+0322 FCB1 B7 F6 2D                   STA     REG_CC          CONDITION CODES
+0323 FCB4 35 02                      PULS    A
+0324 FCB6 B7 F6 2B                   STA     REG_A           A
+0325 FCB9 35 02                      PULS    A
+0326 FCBB B7 F6 2A                   STA     REG_B           B
+0327 FCBE 35 02                      PULS    A
+0328 FCC0 B7 F6 2C                   STA     REG_DP          DP
+0329 FCC3 35 06                      PULS    D
+0330 FCC5 B7 F6 29                   STA     REG_X+1         MSB X
+0331 FCC8 F7 F6 28                   STB     REG_X           LSB X
+0332 FCCB 35 06                      PULS    D
+0333 FCCD B7 F6 27                   STA     REG_Y+1         MSB Y
+0334 FCD0 F7 F6 26                   STB     REG_Y           LSB Y
+0335 FCD3 35 06                      PULS    D
+0336 FCD5 B7 F6 25                   STA     REG_U+1         MSB U
+0337 FCD8 F7 F6 24                   STB     REG_U           LSB U
+0338                         *
+0339                         *  If this is a breakpoint (state = 1), then back up PC to point at SWI
+0340 FCDB 35 10                      PULS    X               PC AFTER INTERRUPT
+0341 FCDD B6 F6 20                   LDA     REG_STATE
+0342 FCE0 81 01                      CMPA    #1
+0343 FCE2 26 02                      BNE     NOTBP           BR IF NOT A BREAKPOINT
+0344 FCE4 30 1F                      LEAX    -1,X            ELSE BACK UP TO POINT AT SWI LOCATION
+0345 FCE6 1F 10              NOTBP   TFR     X,D             TRANSFER PC TO D
+0346 FCE8 B7 F6 2F                   STA     REG_PC+1        MSB
+0347 FCEB F7 F6 2E                   STB     REG_PC          LSB
+0348 FCEE 7E FE 37                   JMP     ENTER_MON       REG_PC POINTS AT POST-INTERRUPT OPCODE
+0349                         *
+0350                         *===========================================================================
+0351                         *  Main loop  wait for command frame from master
+0352                         *
+0353                         *  Uses 6 bytes of stack including return address
+0354                         *
+0355 FCF1 10 CE F6 20        MAIN    LDS     #MONSTACK               CLEAN STACK IS HAPPY STACK
+0356 FCF5 8E F6 30                   LDX     #COMBUF                 BUILD MESSAGE HERE
+0357                         *
+0358                         *  First byte is a function code
+0359 FCF8 BD FC 5F                   JSR     GETCHAR                 GET A FUNCTION (6 bytes of stack)
+0360 FCFB 25 F4                      BCS     MAIN                    JIF TIMEOUT: RESYNC
+0361 FCFD 81 F7                      CMPA    #FN_MIN
+0362 FCFF 25 F0                      BLO     MAIN                    JIF BELOW MIN: ILLEGAL FUNCTION
+0363 FD01 A7 80                      STA     ,X+                     SAVE FUNCTION CODE
+0364                         *
+0365                         *  Second byte is data byte count (may be zero)
+0366 FD03 BD FC 5F                   JSR     GETCHAR                 GET A LENGTH BYTE
+0367 FD06 25 E9                      BCS     MAIN                    JIF TIMEOUT: RESYNC
+0368 FD08 81 80                      CMPA    #COMBUF_SIZE
+0369 FD0A 22 E5                      BHI     MAIN                    JIF TOO LONG: ILLEGAL LENGTH
+0370 FD0C A7 80                      STA     ,X+                     SAVE LENGTH
+0371 FD0E 81 00                      CMPA    #0
+0372 FD10 27 0C                      BEQ     MA80                    SKIP DATA LOOP IF LENGTH = 0
+0373                         *
+0374                         *  Loop for data
+0375 FD12 1F 89                      TFR     A,B                     SAVE LENGTH FOR LOOP
+0376 FD14 BD FC 5F           MA10    JSR     GETCHAR                 GET A DATA BYTE
+0377 FD17 25 D8                      BCS     MAIN                    JIF TIMEOUT: RESYNC
+0378 FD19 A7 80                      STA     ,X+                     SAVE DATA BYTE
+0379 FD1B 5A                         DECB
+0380 FD1C 26 F6                      BNE     MA10
+0381                         *
+0382                         *  Get the checksum
+0383 FD1E BD FC 5F           MA80    JSR     GETCHAR                 GET THE CHECKSUM
+0384 FD21 25 CE                      BCS     MAIN                    JIF TIMEOUT: RESYNC
+0385 FD23 34 02                      PSHS    A                       SAVE CHECKSUM
+0386                         *
+0387                         *  Compare received checksum to that calculated on received buffer
+0388                         *  (Sum should be 0)
+0389 FD25 BD FE B4                   JSR     CHECKSUM
+0390 FD28 AB E0                      ADDA    ,S+                     ADD SAVED CHECKSUM TO COMPUTED
+0391 FD2A 26 C5                      BNE     MAIN                    JIF BAD CHECKSUM
+0392                         *
+0393                         *  Process the message.
+0394 FD2C 8E F6 30                   LDX     #COMBUF
+0395 FD2F A6 80                      LDA     ,X+                     GET THE FUNCTION CODE
+0396 FD31 E6 80                      LDB     ,X+                     GET THE LENGTH
+0397 FD33 81 FF                      CMPA    #FN_GET_STAT
+0398 FD35 27 42                      BEQ     TARGET_STAT
+0399 FD37 81 FE                      CMPA    #FN_READ_MEM
+0400 FD39 27 26                      BEQ     JREAD_MEM
+0401 FD3B 81 FD                      CMPA    #FN_WRITE_M
+0402 FD3D 27 25                      BEQ     JWRITE_MEM
+0403 FD3F 81 FC                      CMPA    #FN_READ_RG
+0404 FD41 27 24                      BEQ     JREAD_REGS
+0405 FD43 81 FB                      CMPA    #FN_WRITE_RG
+0406 FD45 27 23                      BEQ     JWRITE_REGS
+0407 FD47 81 FA                      CMPA    #FN_RUN_TARG
+0408 FD49 27 22                      BEQ     JRUN_TARGET
+0409 FD4B 81 F9                      CMPA    #FN_SET_BYTE
+0410 FD4D 27 21                      BEQ     JSET_BYTES
+0411 FD4F 81 F8                      CMPA    #FN_IN
+0412 FD51 27 20                      BEQ     JIN_PORT
+0413 FD53 81 F7                      CMPA    #FN_OUT
+0414 FD55 27 1F                      BEQ     JOUT_PORT
+0415                         *
+0416                         *  Error: unknown function.  Complain
+0417 FD57 86 F0                      LDA     #FN_ERROR
+0418 FD59 B7 F6 30                   STA     COMBUF          SET FUNCTION AS "ERROR"
+0419 FD5C 86 01                      LDA     #1
+0420 FD5E 7E FE 92                   JMP     SEND_STATUS     VALUE IS "ERROR"
+0421                         *
+0422                         *  long jumps to handlers
+0423 FD61 7E FD 8E           JREAD_MEM       JMP     READ_MEM
+0424 FD64 7E FD A5           JWRITE_MEM      JMP     WRITE_MEM
+0425 FD67 7E FD D1           JREAD_REGS      JMP     READ_REGS
+0426 FD6A 7E FD E6           JWRITE_REGS     JMP     WRITE_REGS
+0427 FD6D 7E FD F8           JRUN_TARGET     JMP     RUN_TARGET
+0428 FD70 7E FE 4B           JSET_BYTES      JMP     SET_BYTES
+0429 FD73 7E FE 79           JIN_PORT        JMP     IN_PORT
+0430 FD76 7E FE 84           JOUT_PORT       JMP     OUT_PORT
+0431                         
+0432                         *===========================================================================
+0433                         *
+0434                         *  Target Status:  FN, len
+0435                         *
+0436                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0437                         *
+0438                         TARGET_STAT
+0439 FD79 8E FC 91                   LDX     #TSTG                   DATA FOR REPLY
+0440 FD7C 10 8E F6 31                LDY     #COMBUF+1               POINTER TO RETURN BUFFER
+0441 FD80 C6 1B                      LDB     #TSTG_SIZE              LENGTH OF REPLY
+0442 FD82 E7 A0                      STB     ,Y+                     SET SIZE IN REPLY BUFFER
+0443 FD84 A6 80              TS10    LDA     ,X+                     MOVE REPLY DATA TO BUFFER
+0444 FD86 A7 A0                      STA     ,Y+
+0445 FD88 5A                         DECB
+0446 FD89 26 F9                      BNE     TS10
+0447                         *
+0448                         *  Compute checksum on buffer, and send to master, then return
+0449 FD8B 7E FE 9C                   JMP     SEND
+0450                         
+0451                         *===========================================================================
+0452                         *
+0453                         *  Read Memory:  FN, len, page, Alo, Ahi, Nbytes
+0454                         *
+0455                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0456                         *
+0457                         READ_MEM
+0458                         *
+0459                         *  Set map
+0460                         *;;;    LDA     0,X
+0461                         *;;;    STA     MAPIMG
+0462                         *;;;    STA     MAPREG
+0463                         *
+0464                         *  Get address
+0465 FD8E A6 02                      LDA     2,X                     MSB OF ADDRESS IN A
+0466 FD90 E6 01                      LDB     1,X                     LSB OF ADDRESS IN B
+0467 FD92 1F 02                      TFR     D,Y                     ADDRESS IN Y
+0468                         *
+0469                         *  Prepare return buffer: FN (unchanged), LEN, DATA
+0470 FD94 E6 03                      LDB     3,X                     NUMBER OF BYTES TO RETURN
+0471 FD96 F7 F6 31                   STB     COMBUF+1                RETURN LENGTH = REQUESTED DATA
+0472 FD99 27 07                      BEQ     GLP90                   JIF NO BYTES TO GET
+0473                         *
+0474                         *  Read the requested bytes from local memory
+0475 FD9B A6 A0              GLP     LDA     ,Y+                     GET BYTE
+0476 FD9D A7 80                      STA     ,X+                     STORE TO RETURN BUFFER
+0477 FD9F 5A                         DECB
+0478 FDA0 26 F9                      BNE     GLP
+0479                         *
+0480                         *  Compute checksum on buffer, and send to master, then return
+0481 FDA2 7E FE 9C           GLP90   JMP     SEND
+0482                         
+0483                         *===========================================================================
+0484                         *
+0485                         *  Write Memory:  FN, len, page, Alo, Ahi, (len-3 bytes of Data)
+0486                         *
+0487                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0488                         *
+0489                         *  Uses 6 bytes of stack
+0490                         *
+0491                         WRITE_MEM
+0492                         *
+0493                         *  Set map
+0494 FDA5 A6 80                      LDA     ,X+
+0495                         *;;;    STA     MAPIMG
+0496                         *;;;    STA     MAPREG
+0497                         *
+0498                         *  Get address
+0499 FDA7 E6 80                      LDB     ,X+                     LSB OF ADDRESS IN B
+0500 FDA9 A6 80                      LDA     ,X+                     MSB OF ADDRESS IN A
+0501 FDAB 1F 02                      TFR     D,Y                     ADDRESS IN Y
+0502                         *
+0503                         *  Compute number of bytes to write
+0504 FDAD F6 F6 31                   LDB     COMBUF+1                NUMBER OF BYTES TO RETURN
+0505 FDB0 C0 03                      SUBB    #3                      MINUS PAGE AND ADDRESS
+0506 FDB2 27 14                      BEQ     WLP50                   JIF NO BYTES TO PUT
+0507                         *
+0508                         *  Write the specified bytes to local memory
+0509 FDB4 34 34                      PSHS    B,X,Y
+0510 FDB6 A6 80              WLP     LDA     ,X+                     GET BYTE TO WRITE
+0511 FDB8 A7 A0                      STA     ,Y+                     STORE THE BYTE AT ,Y
+0512 FDBA 5A                         DECB
+0513 FDBB 26 F9                      BNE     WLP
+0514                         *
+0515                         *  Compare to see if the write worked
+0516 FDBD 35 34                      PULS    B,X,Y
+0517 FDBF A6 80              WLP20   LDA     ,X+                     GET BYTE JUST WRITTEN
+0518 FDC1 A1 A0                      CMPA    ,Y+
+0519 FDC3 26 07                      BNE     WLP80                   BR IF WRITE FAILED
+0520 FDC5 5A                         DECB
+0521 FDC6 26 F7                      BNE     WLP20
+0522                         *
+0523                         *  Write succeeded:  return status = 0
+0524 FDC8 86 00              WLP50   LDA     #0                      RETURN STATUS = 0
+0525 FDCA 20 02                      BRA     WLP90
+0526                         *
+0527                         *  Write failed:  return status = 1
+0528 FDCC 86 01              WLP80   LDA     #1
+0529                         
+0530                         *  Return OK status
+0531 FDCE 7E FE 92           WLP90   JMP     SEND_STATUS
+0532                         
+0533                         *===========================================================================
+0534                         *
+0535                         *  Read registers:  FN, len=0
+0536                         *
+0537                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0538                         *
+0539                         READ_REGS
+0540                         *
+0541                         *  Enter here from SWI after "RUN" and "STEP" to return task registers
+0542                         RETURN_REGS
+0543 FDD1 10 8E F6 20                LDY     #TASK_REGS              POINTER TO REGISTERS
+0544 FDD5 C6 10                      LDB     #TASK_REG_SZ            NUMBER OF BYTES
+0545 FDD7 8E F6 31                   LDX     #COMBUF+1               POINTER TO RETURN BUFFER
+0546 FDDA E7 80                      STB     ,X+                     SAVE RETURN DATA LENGTH
+0547                         *
+0548                         *  Copy the registers
+0549 FDDC A6 A0              GRLP    LDA     ,Y+                     GET BYTE TO A
+0550 FDDE A7 80                      STA     ,X+                     STORE TO RETURN BUFFER
+0551 FDE0 5A                         DECB
+0552 FDE1 26 F9                      BNE     GRLP
+0553                         *
+0554                         *  Compute checksum on buffer, and send to master, then return
+0555 FDE3 7E FE 9C                   JMP     SEND
+0556                         
+0557                         *===========================================================================
+0558                         *
+0559                         *  Write registers:  FN, len, (register image)
+0560                         *
+0561                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0562                         *
+0563                         WRITE_REGS
+0564                         *
+0565 FDE6 5D                         TSTB                            NUMBER OF BYTES
+0566 FDE7 27 0B                      BEQ     WRR80                   JIF NO REGISTERS
+0567                         *
+0568                         *  Copy the registers
+0569 FDE9 10 8E F6 20                LDY     #TASK_REGS              POINTER TO REGISTERS
+0570 FDED A6 80              WRRLP   LDA     ,X+                     GET BYTE TO A
+0571 FDEF A7 A0                      STA     ,Y+                     STORE TO REGISTER RAM
+0572 FDF1 5A                         DECB
+0573 FDF2 26 F9                      BNE     WRRLP
+0574                         *
+0575                         *  Return OK status
+0576 FDF4 4F                 WRR80   CLRA
+0577 FDF5 7E FE 92                   JMP     SEND_STATUS
+0578                         
+0579                         *===========================================================================
+0580                         *
+0581                         *  Run Target:  FN, len
+0582                         *
+0583                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0584                         *
+0585                         RUN_TARGET
+0586                         *
+0587                         *  Restore user's map
+0588                         **      LDA     REG_PAGE                USER'S PAGE
+0589                         **      STA     MAPIMG                  SET IMAGE
+0590                         **      STA     MAPREG                  SET MAPPING REGISTER
+0591                         *
+0592                         *  Switch to user stack
+0593 FDF8 B6 F6 23                   LDA     REG_SP+1                BACK TO USER STACK
+0594 FDFB F6 F6 22                   LDB     REG_SP
+0595 FDFE 1F 04                      TFR     D,S                     TO S
+0596                         *
+0597                         *  Restore registers
+0598 FE00 B6 F6 2F                   LDA     REG_PC+1                MS USER PC FOR RTI
+0599 FE03 F6 F6 2E                   LDB     REG_PC                  LS USER PC FOR RTI
+0600 FE06 34 06                      PSHS    D
+0601                         *
+0602 FE08 B6 F6 25                   LDA     REG_U+1
+0603 FE0B F6 F6 24                   LDB     REG_U
+0604 FE0E 34 06                      PSHS    D
+0605                         *
+0606 FE10 B6 F6 27                   LDA     REG_Y+1
+0607 FE13 F6 F6 26                   LDB     REG_Y
+0608 FE16 34 06                      PSHS    D
+0609                         *
+0610 FE18 B6 F6 29                   LDA     REG_X+1
+0611 FE1B F6 F6 28                   LDB     REG_X
+0612 FE1E 34 06                      PSHS    D
+0613                         *
+0614 FE20 B6 F6 2C                   LDA     REG_DP
+0615 FE23 34 02                      PSHS    A
+0616                         *
+0617 FE25 B6 F6 2A                   LDA     REG_B
+0618 FE28 34 02                      PSHS    A
+0619                         *
+0620 FE2A B6 F6 2B                   LDA     REG_A
+0621 FE2D 34 02                      PSHS    A
+0622                         *
+0623 FE2F B6 F6 2D                   LDA     REG_CC                  SAVE USER CONDITION CODES FOR RTI
+0624 FE32 8A 50                      ORA     #E                      _MUST_ BE "ALL REGS PUSHED"
+0625 FE34 34 02                      PSHS    A
+0626                         *
+0627                         *  Return to user
+0628 FE36 3B                         RTI
+0629                         *
+0630                         *===========================================================================
+0631                         *
+0632                         *  Common continue point for all monitor entrances
+0633                         *  SP = user stack
+0634                         ENTER_MON
+0635 FE37 1F 40                      TFR     S,D             USER STACK POINTER
+0636 FE39 B7 F6 23                   STA     REG_SP+1        SAVE USER'S STACK POINTER (MSB)
+0637 FE3C F7 F6 22                   STB     REG_SP          LSB
+0638                         *
+0639                         *  Change to our own stack
+0640 FE3F 10 CE F6 20                LDS     #MONSTACK       AND USE OURS INSTEAD
+0641                         *
+0642                         *  Operating system variables
+0643                         **      LDA     MAPIMG          GET CURRENT USER MAP
+0644 FE43 86 00                      LDA     #0              ... OR ZERO IF UNMAPPED TARGET
+0645 FE45 B7 F6 21                   STA     REG_PAGE        SAVE USER'S PAGE
+0646                         *
+0647                         *  Return registers to master
+0648 FE48 7E FD D1                   JMP     RETURN_REGS
+0649                         
+0650                         *===========================================================================
+0651                         *
+0652                         *  Set target byte(s):  FN, len { (page, alow, ahigh, data), (...)... }
+0653                         *
+0654                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0655                         *
+0656                         *  Return has FN, len, (data from memory locations)
+0657                         *
+0658                         *  If error in insert (memory not writable), abort to return short data
+0659                         *
+0660                         *  This function is used primarily to set and clear breakpoints
+0661                         *
+0662                         *  Uses 1 byte of stack
+0663                         *
+0664                         SET_BYTES
+0665 FE4B CE F6 31                   LDU     #COMBUF+1               POINTER TO RETURN BUFFER
+0666 FE4E 86 00                      LDA     #0
+0667 FE50 A7 C0                      STA     ,U+                     SET RETURN COUNT AS ZERO
+0668 FE52 54                         LSRB
+0669 FE53 54                         LSRB                            LEN/4 = NUMBER OF BYTES TO SET
+0670 FE54 27 20                      BEQ     SB99                    JIF NO BYTES (COMBUF+1 = 0)
+0671                         *
+0672                         *  Loop on inserting bytes
+0673 FE56 34 04              SB10    PSHS    B                       SAVE LOOP COUNTER
+0674                         *
+0675                         *  Set map
+0676                         *;;;    LDA     0,X
+0677                         *;;;    STA     MAPIMG
+0678                         *;;;    STA     MAPREG
+0679                         *
+0680                         *  Get address
+0681 FE58 A6 02                      LDA     2,X                     MSB OF ADDRESS IN A
+0682 FE5A E6 01                      LDB     1,X                     LSB OF ADDRESS IN B
+0683 FE5C 1F 02                      TFR     D,Y                     MEMORY ADDRESS IN Y
+0684                         *
+0685                         *  Read current data at byte location
+0686 FE5E A6 A4                      LDA     0,Y
+0687                         *
+0688                         *  Insert new data at byte location
+0689 FE60 E6 03                      LDB     3,X                     GET BYTE TO STORE
+0690 FE62 E7 A4                      STB     0,Y                     WRITE TARGET MEMORY
+0691                         *
+0692                         *  Verify write
+0693 FE64 E1 A4                      CMPB    0,Y                     READ TARGET MEMORY
+0694 FE66 35 04                      PULS    B                       RESTORE LOOP COUNT, CC'S INTACT
+0695 FE68 26 0C                      BNE     SB90                    BR IF INSERT FAILED: ABORT
+0696                         *
+0697                         *  Save target byte in return buffer
+0698 FE6A A7 C0                      STA     ,U+
+0699 FE6C 7C F6 31                   INC     COMBUF+1                COUNT ONE RETURN BYTE
+0700                         *
+0701                         *  Loop for next byte
+0702 FE6F 30 04                      LEAX    4,X                     STEP TO NEXT BYTE SPECIFIER
+0703 FE71 F1 F6 31                   CMPB    COMBUF+1
+0704 FE74 26 E0                      BNE     SB10                    *LOOP FOR ALL BYTES
+0705                         *
+0706                         *  Return buffer with data from byte locations
+0707                         SB90
+0708                         *
+0709                         *  Compute checksum on buffer, and send to master, then return
+0710 FE76 7E FE 9C           SB99    JMP     SEND
+0711                         
+0712                         *===========================================================================
+0713                         *
+0714                         *  Input from port:  FN, len, PortAddressLo, PAhi (=0)
+0715                         *
+0716                         *  While the 6809 has no input or output instructions, we retain these
+0717                         *  to allow write-without-verify
+0718                         *
+0719                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0720                         *
+0721                         IN_PORT
+0722                         *
+0723                         *  Get port address
+0724 FE79 A6 01                      LDA     1,X                     MSB OF ADDRESS IN A
+0725 FE7B E6 84                      LDB     0,X                     LSB OF ADDRESS IN B
+0726 FE7D 1F 02                      TFR     D,Y                     MEMORY ADDRESS IN Y
+0727                         *
+0728                         *  Read the requested byte from local memory
+0729 FE7F A6 A4                      LDA     0,Y
+0730                         *
+0731                         *  Return byte read as "status"
+0732 FE81 7E FE 92                   JMP     SEND_STATUS
+0733                         
+0734                         *===========================================================================
+0735                         *
+0736                         *  Output to port  FN, len, PortAddressLo, PAhi (=0), data
+0737                         *
+0738                         *  Entry with A=function code, B=data size, X=COMBUF+2
+0739                         *
+0740                         OUT_PORT
+0741                         *
+0742                         *  Get port address
+0743 FE84 A6 01                      LDA     1,X                     MSB OF ADDRESS IN A
+0744 FE86 E6 84                      LDB     0,X                     LSB OF ADDRESS IN B
+0745 FE88 1F 02                      TFR     D,Y                     MEMORY ADDRESS IN Y
+0746                         *
+0747                         *  Get data
+0748 FE8A A6 02                      LDA     2,X
+0749                         *
+0750                         *  Write value to port
+0751 FE8C A7 A4                      STA     0,Y
+0752                         *
+0753                         *  Do not read port to verify (some I/O devices don't like it)
+0754                         *
+0755                         *  Return status of OK
+0756 FE8E 4F                         CLRA
+0757 FE8F 7E FE 92                   JMP     SEND_STATUS
+0758                         
+0759                         *===========================================================================
+0760                         *  Build status return with value from "A"
+0761                         *
+0762                         SEND_STATUS
+0763 FE92 B7 F6 32                   STA     COMBUF+2                SET STATUS
+0764 FE95 86 01                      LDA     #1
+0765 FE97 B7 F6 31                   STA     COMBUF+1                SET LENGTH
+0766 FE9A 20 00                      BRA     SEND
+0767                         
+0768                         *===========================================================================
+0769                         *  Append checksum to COMBUF and send to master
+0770                         *
+0771 FE9C BD FE B4           SEND    JSR     CHECKSUM                GET A=CHECKSUM, X->checksum location
+0772 FE9F 40                         NEGA
+0773 FEA0 A7 84                      STA     0,X                     STORE NEGATIVE OF CHECKSUM
+0774                         *
+0775                         *  Send buffer to master
+0776 FEA2 8E F6 30                   LDX     #COMBUF                 POINTER TO DATA
+0777 FEA5 E6 01                      LDB     1,X                     LENGTH OF DATA
+0778 FEA7 CB 03                      ADDB    #3                      PLUS FUNCTION, LENGTH, CHECKSUM
+0779 FEA9 A6 80              SND10   LDA     ,X+
+0780 FEAB BD FC 7C                   JSR     PUTCHAR                 SEND A BYTE
+0781 FEAE 5A                         DECB
+0782 FEAF 26 F8                      BNE     SND10
+0783 FEB1 7E FC F1                   JMP     MAIN                    BACK TO MAIN LOOP
+0784                         
+0785                         *===========================================================================
+0786                         *  Compute checksum on COMBUF.  COMBUF+1 has length of data,
+0787                         *  Also include function byte and length byte
+0788                         *
+0789                         *  Returns:
+0790                         *       A = checksum
+0791                         *       X = pointer to next byte in buffer (checksum location)
+0792                         *       B is scratched
+0793                         *
+0794                         CHECKSUM
+0795 FEB4 8E F6 30                   LDX     #COMBUF                 pointer to buffer
+0796 FEB7 E6 01                      LDB     1,X                     length of message
+0797 FEB9 CB 02                      ADDB    #2                      plus function, length
+0798 FEBB 86 00                      LDA     #0                      init checksum to 0
+0799 FEBD AB 80              CHK10   ADDA    ,X+
+0800 FEBF 5A                         DECB
+0801 FEC0 26 FB                      BNE     CHK10                   loop for all
+0802 FEC2 39                         RTS                             return with checksum in A
+0803                         
+0804                         ***********************************************************************
+0805                         *
+0806                         *  Interrupt handlers to catch unused interrupts and traps
+0807                         *  Registers are stacked.  Jump through RAM vector using X, type in A
+0808                         *
+0809                         *  This will affect only interrupt routines looking for register values!
+0810                         *
+0811                         *  Our default handler uses the code in "A" as the processor state to be
+0812                         *  passed back to the host.
+0813                         *
+0814 FEC3 86 07              RES_ENT     LDA     #7
+0815 FEC5 BE F0 00                       LDX     RAMVEC+0
+0816 FEC8 6E 84                          JMP     0,X
+0817                         *
+0818 FECA 86 06              SWI3_ENT    LDA     #6
+0819 FECC BE F0 02                       LDX     RAMVEC+2
+0820 FECF 6E 84                          JMP     0,X
+0821                         *
+0822 FED1 86 05              SWI2_ENT    LDA     #5
+0823 FED3 BE F0 04                       LDX     RAMVEC+4
+0824 FED6 6E 84                          JMP     0,X
+0825                         *
+0826                         *  May have only PC and CC's pushed (unless we were waiting for an interrupt)
+0827                         *  Push all registers here for common entry (else we can't use our RAM vector)
+0828 FED8 B7 F6 2B           FIRQ_ENT    STA     REG_A       SAVE A REG
+0829 FEDB 35 02                          PULS    A           GET CC'S FROM STACK
+0830 FEDD 85 50                          BITA    #E
+0831 FEDF 26 09                          BNE     FIRQ9       BR IF ALL REGISTERS PUSHED ALREADY
+0832 FEE1 34 7C                          PSHS    U,Y,X,DP,B  ELSE PUSH THEM NOW
+0833 FEE3 F6 F6 2B                       LDB     REG_A
+0834 FEE6 34 04                          PSHS    B
+0835 FEE8 8A 50                          ORA     #E          SET AS "ALL REGS PUSHED"
+0836 FEEA 34 02              FIRQ9       PSHS    A           REPLACE CC'S
+0837 FEEC 86 04                          LDA     #4
+0838 FEEE BE F0 06                       LDX     RAMVEC+6
+0839 FEF1 6E 84                          JMP     0,X
+0840                         *
+0841 FEF3 86 03              IRQ_ENT     LDA     #3
+0842 FEF5 BE F0 08                       LDX     RAMVEC+8
+0843 FEF8 6E 84                          JMP     0,X
+0844                         *
+0845 FEFA 86 02              NMI_ENT     LDA     #2
+0846 FEFC BE F0 0C                       LDX     RAMVEC+12
+0847 FEFF 6E 84                          JMP     0,X
+0848                         *
+0849 FF01 86 01              SWI_ENT     LDA     #1
+0850 FF03 7E FC AC                       JMP     INT_ENTRY
+0851                         *
+0852                         *============================================================================
+0853                         *  VECTORS THROUGH RAM
+0854 FFF0                            ORG     HARD_VECT
+0855                         
+0856 FFF0 FE C3                      FDB     RES_ENT                 fff0 (reserved)
+0857 FFF2 FE CA                      FDB     SWI3_ENT                fff2 (SWI3)
+0858 FFF4 FE D1                      FDB     SWI2_ENT                fff4 (SWI2)
+0859 FFF6 FE D8                      FDB     FIRQ_ENT                fff6 (FIRQ)
+0860 FFF8 FE F3                      FDB     IRQ_ENT                 fff8 (IRQ)
+0861 FFFA FF 01                      FDB     SWI_ENT                 fffa (SWI/breakpoint)
+0862 FFFC FE FA                      FDB     NMI_ENT                 fffc (NMI)
+0863 FFFE FC 00                      FDB     RESET                   fffe reset
+0864                         *
+0865                                 END     RESET
+Program + Init Data = 790 bytes
+Error count = 0

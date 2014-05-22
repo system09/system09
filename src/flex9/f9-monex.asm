@@ -1,0 +1,1303 @@
+*
+** FLEX 9 DISK DRIVERS
+*
+* FOR SYS09BUG ON THE DIGILENT SPARTAN 3 STARTER BOARD
+* AND THE TERASIC CYCLONE 2 DE1 BOARD
+* WITH I/O MAPPED AT $XE000
+* AND ROM MAPPED AT $XF000
+* THE DIGILENT SPARTAN 3 STARTER BOARD HAS 1MBYTE OF SRAM
+* THE TERASIC CYCLONE 2 DE1 BOARD HAS 512KB OF SRAM
+* THE FIRST 64K IS USED BY FLEX,
+* THE SECOND 128K IS USED AS A ROM DISK
+* THE REMAINING RAM IS USED FOR A RAM DISK
+*
+*
+CFLAG   EQU $01     CARRY FLAG
+VFLAG   EQU $02     OVERFLOW FLAG
+ZFLAG   EQU $04     ZERO FLAG
+NFLAG   EQU $08     NEGATIVE FLAG
+IFLAG   EQU $10     IRQ MASK CC
+HFLAG   EQU $20     HALF CARRY
+FFLAG   EQU $40     FIRQ MASK CC
+EFLAG   EQU $80     ENTIRE FLAG
+*
+MAPPAG  EQU $00     PAGE $0000 DAT ADDRESS
+DATREG  EQU IC11    DAT REGISTERS
+*
+* Serial Port
+*
+ACIAC1  EQU ACIAS
+ACIAD1  EQU ACIAS+1
+DELCON  EQU 1250    Delay (Processor clock in MHz * 50)
+*
+* XMODEM Control characters
+*
+SOH     EQU $01
+EOT     EQU $04
+ACK     EQU $06
+NAK     EQU $15
+CAN     EQU $18
+*
+* DRIVE GEOMETRY
+*
+EMAXSEC EQU 14     ROM DISK
+EMAXTRK EQU 48     3  * 16 * 14 * 256 = 172,032 Bytes
+ETOTSEC EQU EMAXTRK*EMAXSEC-EMAXSEC
+*
+RMAXSEC EQU 14     RAM DISK
+* RMAXTRK EQU 192     12 * 16 * 256 = 688,128 Bytes (Spartan 3 starter with 1MB)
+RMAXTRK EQU 64     4 * 16 * 14 * 256 = 229,376 Bytes (Cyclone 2 DE1 with 512KB)
+RTOTSEC EQU RMAXTRK*RMAXSEC-RMAXSEC
+*
+* DRIVE TYPES
+*
+DTYPROM EQU 0      ROM DISK
+DTYPRAM EQU 1      RAM DISK
+DTYPFLS EQU 2      FLASH DISK
+DTYPNET EQU 3      FLEXNET DISK
+*
+       ORG   $DE00
+*  
+* DISK DRIVER JUMP TABLE LAST UPDATE: 22/12/2006
+* Disk driver for RAM Disk.
+*
+* 14 SECTORS PER TRACK
+* 16 * N TRACKS PER DISK
+*
+* ROM DISK OCCUPIES $10000 - $1E000 ... $30000 - $3E000
+* RAM DISK OCCUPIES $40000 - $4E000 ... $F0000 - $FE000
+* Track Buffer page mapped at $E000 - $EFFF
+* MAPPAG = $00 = 0 x $1000 (4 K pages)
+
+* ON SWTPC ROM AT $XF000 AND IO AT $XE000
+* APPEARS THROUGHOUT THE MEMORY SO MUST BE SKIPPED OVER
+* WHEN USING RAM AS A RAMDISK.
+* THE MSN OF THE TRACK MAPS INTO THE MSN OF THE DAT
+* THE LSN OF THE TRACK NUMBER INDEXES INTO THE 4K RAM PAGE
+* THE SECTOR MAPS INTO THE LSN OF THE DAT WHICH IS INVERTED
+*
+*
+*
+* FLEX disk jump table.
+*
+READ   JMP   READSC
+WRITE  JMP   WRITSC
+VERIFY JMP   BUSY
+RESTOR JMP   RESTR1
+DRIVE  JMP   DRVSEL
+DRVRDY JMP   CHKRDY
+QUICK  JMP   CHKQIK
+COLDDR JMP   DINIT
+WARMDR JMP   DWARM
+SEEK   JMP   SEEKTS
+*
+* RAM SPACE
+*
+DRVNUM  FCB  0
+TRACK   FCB  0
+SECTOR  FCB  0
+CHKSUM  FCB  0
+CCSAVE  FCB  0
+BLKNUM  FCB  0 Xmodem block number
+BYTCNT  FCB  0 Xmodem byte count
+XSTATE  FDB  0 Xmodem State Vector
+DELCNT  FCB  $00,$00,$00 Xmodem Poll timer
+*
+* Disc driver type table.
+* Indexed by drive number
+*
+DTYPTAB FCB  DTYPROM Drive 0 (ROM Disk)
+        FCB  DTYPRAM Drive 1 (RAM Disk)
+        FCB  DTYPFLS Drive 2 (FLASH Disk)
+        FCB  DTYPNET Drive 3 (NETPC Disk)
+*
+* RAM Disk offset
+* Indexed by drive type
+*
+DOFFTAB FCB  $10 ROM Disk $10000
+        FCB  $40 RAM DISK $40000
+        FCB  $FF Flash Disk
+        FCB  $FF NETPC Disk
+*
+REAVEC  RMB  2             Disc driver jump table.
+WRIVEC  RMB  2
+VERVEC  RMB  2
+RSTVEC  RMB  2
+DRVVEC  RMB  2
+CHKVEC  RMB  2
+QUIVEC  RMB  2
+INIVEC  RMB  2
+WARVEC  RMB  2
+SEEVEC  RMB  2
+*
+* SECTOR BUFFER
+*
+BUFFER  RMB  256
+SYNCREG RMB  4      Prom input register
+*
+****************************************
+*
+* START OF EXTENSION COMMANDS
+*
+****************************************
+*
+        ORG MONEXT
+        FDB NEXTEXT   Jump to next extended command
+*
+*
+*****************************************
+* Disk drivers                          *
+* ------------                          *
+* The system dependant code for the     *
+* disc drivers fits here. Two tables    *
+* must be included. These are DTYPTAB a  *
+* four byte table that defines which of *
+* the (up to four) following sets of    *
+* jump tables to use, and TABSRT the    *
+* jump tables themselves. For a full    *
+* description of the floppy drivers see *
+* section 4 (pp9-14) of the general     *
+* Flex adaptation guide.                *
+*****************************************
+*
+* Mass storage drivers for embedded applications.
+*
+* Jump tables.
+TABSRT  FDB EREAD Drive type 0 (ROM disk).
+        FDB EWRITE
+        FDB ECHECK
+        FDB ECHECK
+        FDB ECHECK
+        FDB ECHECK
+        FDB ECHECK
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+*
+        FDB EREAD Drive type 1 (RAM disk).
+        FDB EWRITE
+        FDB ECHECK
+        FDB ECHECK
+        FDB ECHECK
+        FDB ECHECK
+        FDB ECHECK
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+*
+        FDB DDUMMY Drive type 2 (External Flash disk).
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+*
+        FDB NREAD  Drive type 3 (NetPC drive via serial port).
+        FDB NWRITE
+        FDB NVERIFY
+        FDB NCHECK
+        FDB NCHECK
+        FDB NCHECK
+        FDB NCHECK
+        FDB DDUMMY
+        FDB DDUMMY
+        FDB DDUMMY
+*
+*
+* Dummy routine (no errors).
+DDUMMY  CLRB
+        TSTB  Set (z)=1
+        ANDCC  #$FF-CFLAG  Set (c)=0
+        RTS
+*               *
+**************************
+* Main Flex entry points *
+*************************
+*
+* Read sector routine.
+* Entry: (X) = address where sector is to be placed.
+*        (A) = Track  number.
+*        (B) = Sector number.
+* Exit:  (B) = Error code  (z)=1 if no error.
+READSC  JMP  [REAVEC]
+*
+* Write track routine.
+* Entry: (X) = Address of area of memory from which the data will be taken.
+*        (A) = Track number.
+*        (B) = Sector number.
+* Exit:  (B) = Error condition, (Z)=1 no an error.
+WRITSC  JMP  [WRIVEC]
+*
+* Verify sector routine.
+* Entry: no parameters.
+* Exit:  (B) = Error condition (Z)=1 if no error.
+BUSY  JMP  [VERVEC]
+*
+* Restore drive to track 00.
+* Entry: (X) = FCB address (3,X contains drive number).
+* Exit:  (B) = Error condition, (Z)=1 if no error.
+RESTR1  BSR  DRVSEL Select drive first.
+        BEQ  RST1
+        RTS
+RST1    JMP  [RSTVEC]
+*
+* Select current drive.
+* Entry: (X) = FCB address (3,X contains drive number).
+* Exit:  (B) = Error condition, (Z)=0 and (c)=1 if error.
+*        (B) = $0F if non existant drive.
+DRVSEL  PSHS  X,Y
+        LDB  3,X  Get driver type.
+        STB  DRVNUM
+        LDX  #DTYPTAB
+        LDA  B,X
+        CMPA  #$FF  Is the drive nonexistant?
+        BNE  DRIVE1
+        PULS  X,Y
+        LDB  #$0F
+        TSTB
+        ORCC  #$01
+        RTS
+*
+DRIVE1  LDB  #20  Get correct table start address.
+        MUL
+        LDX  #TABSRT
+        LEAX  D,X
+        LDY  #REAVEC Copy table into ram.
+        LDB  #20
+DRIVE2  LDA  0,X+
+        STA  0,Y+
+        DECB
+        BNE  DRIVE2
+        PULS X,Y
+        JMP  [DRVVEC]
+*
+* Check for drive ready.
+* Entry: (X) = FCB address (3,X contains drive number)>
+* Exit:  (B) = Error condition, (Z)=0 AND (C)=1 if drive is not ready.
+CHKRDY  JMP  [CHKVEC]
+*
+* Quick drive ready check.
+* Entry: (X) = FCB address (3,X contains drive number).
+* Exit:  (B) = Error condition, (Z)=0 AND (c)=1 if drive not ready.
+CHKQIK  JMP  [QUIVEC]
+*
+* Init (cold start).
+* Entry: no parameters.
+* Exit: no change.
+DINIT   CLRA
+DINIT1  STA  DRVNUM  Init each valid drive in turn.
+        LDX  #DRVNUM-3
+        BSR  DRVSEL
+        BCS  DINIT2
+        JSR  [INIVEC]
+DINIT2  LDA  DRVNUM
+        INCA
+        CMPA  #4
+        BNE  DINIT1
+        RTS
+*
+* Warm start.
+* Entry: no parameters.
+* Exit: no change.
+DWARM    JMP  [WARVEC]
+*
+* Seek track.
+* Entry: (A) = Track number.
+*        (B) = Sector number.
+* Exit:  (B) = Error condition, (Z)=1 if no error.
+SEEKTS  JMP  [SEEVEC]
+*
+*
+*****************************************************
+* ROMdisk drivers                                   *
+* ---------------                                   *
+* Drivers to support a ROMdisk in the external RAM  *
+* of the SYS09. The ROMdisk base address is $10000   *
+*****************************************************
+* Dummy return for ROM disk (write protected!)
+*
+* MAP RAM DISK INTO MEMORY SPACE
+*
+MAPIN   TFR   CC,A     ; Save state of interrupt masks
+        STA   CCSAVE
+        ORCC  #FFLAG+IFLAG ; Mask interrupts while IO mapped out
+        LDU   #DTYPTAB  ; Point to Drive Type table
+        LDB   DRVNUM   ; Get working drive number
+        LDB   B,U
+        LDU   #DOFFTAB
+        LDA   TRACK
+        ADDA  B,U      ; Add Base offset into RAM
+        ANDA  #$F0     ; Mask MSN
+        STA   ,-S      ; Save A on stack
+* 
+        LDA   SECTOR
+        SUBA  #1       ; Sectors 1 to 14 => 0 to 13
+        EORA  #$0F     ; Complement LSNybble
+        ANDA  #$0F
+*
+        ADDA  ,S+       ; Add sector to LSN of Track and pop
+        STA   DATREG+MAPPAG
+*
+        LDA   TRACK   ; LSN of Track indexes into 4K page
+        ANDA  #$0F
+        ADDA  #MAPPAG*16
+        CLRB
+        TFR   D,U
+        RTS
+*
+* MAP RAM DISK OUT OF MEMORY
+*
+MAPOUT  LDA   #MAPPAG  ; Point to the Flex page
+        EORA  #$0F     ; Complement LSNybble
+        STA   DATREG+MAPPAG ; map in Flex page
+        LDA   CCSAVE   ; restore interrupt masks
+        TFR   A,CC
+        RTS
+*
+* Seek track and sector
+* A holds track number (0-32)
+* B holds sector number (1-14)
+*
+ESEEK   STA   TRACK
+        STB   SECTOR
+        ANDCC #$FE   ; CLEAR CARRY
+        ORCC  #$04   ; SET Z
+        RTS
+*
+* MARK DISK READ ONLY
+*
+EDUMMY  LDB  #$40
+        TSTB
+        ORCC  #$01
+        RTS
+*
+EREAD   PSHS X,Y,U push sequentialy to preserve order on stack
+        LBSR ESEEK
+        LBSR MAPIN build external ram address
+*
+        LDY #BUFFER
+        CLRB
+ERLOOP1 LDA 0,U+ move 256 bytes to buffer from external RAM
+        STA 0,Y+
+        DECB
+        BNE ERLOOP1
+*
+        LBSR MAPOUT
+*
+        LDY #BUFFER
+        CLRB
+ERLOOP2 LDA 0,Y+ move 256 bytes from buffer to Flex RAM
+        STA 0,X+
+        DECB
+        BNE ERLOOP2
+*
+        CLRB
+        PULS X,Y,U,PC  restore all registers
+*
+* check for marker bytes $AA55 in first bytes of first track/sector
+*
+*ECHECK  CLRA 
+*        LDB  #1
+*        LDX  #BUFFER
+*        BSR  EREAD
+*        LDD  BUFFER
+*        CMPD  #$AA55
+*        BNE  EERR
+*        LBRA  DDUMMY
+*EERR    LDB  #$80 not ready bit set
+*        TSTB
+*        ORCC  #$01
+*        RTS
+ECHECK CLRB
+       RTS
+*
+* Write Sector
+*
+EWRITE  PSHS X,Y,U
+        LBSR ESEEK
+        LDU  #DTYPTAB  ; Point to Drive Type table
+        LDB  DRVNUM    ; Get working drive number
+        LDB  B,U       ; Fetch Drive type
+        CMPB #DTYPRAM  ; Is it a RAM Disk ?
+        BEQ  EWOK      ; Yep, can write to it
+        CMPB #DTYPROM  ; Allow writes to ROM Disk too
+        BEQ  EWOK
+        LBRA EDUMMY    ; Nope report read only 
+*
+EWOK    LDY #BUFFER
+        CLRB
+EWLOOP1 LDA 0,X+ move 256 bytes to buffer from Flex RAM
+        STA 0,Y+
+        DECB
+        BNE EWLOOP1
+*
+        LBSR MAPIN
+*
+        LDY #BUFFER
+        CLRB
+EWLOOP2 LDA 0,Y+ move 256 bytes from buffer to external RAM
+        STA 0,U+
+        DECB
+        BNE EWLOOP2
+*
+        LBSR MAPOUT
+*
+	CLRB
+        PULS X,Y,U,PC
+*
+*
+*****************************************************
+* FlexNet drivers                                   *
+* ---------------                                   *
+* Drivers to support a remote connection via the    *
+* serial port using the FlexNet protocol as defined *
+* in FLEXNet_421B                                   *
+*****************************************************
+*
+*
+* read sector from remote drive
+*
+NREAD   PSHS    B
+        PSHS    A
+        CLR     CHKSUM          clear checksum
+        CLR     CHKSUM+1
+*	
+        LDA     #'s             Send read sector command
+        JSR     SCHAR
+        BCC     NRD_DNR         if timeout, then flag drive not ready
+*
+        LDA     DRVNUM           send drive
+        JSR     SCHAR
+        BCC     NRD_DNR           
+*
+        PULS    A               send track
+        JSR     SCHAR
+        BCC     NRD_DNR          
+*
+        PULS    A               send sector
+        JSR     SCHAR
+        BCC     NRD_DNR          
+*
+* transfer 256 bytes
+        CLRB                    
+NREAD1  JSR     RCHAR           read byte
+        BCC     NRD_DNR         if timeout, then flag drive not ready
+        STA     0,X+
+        ADDA    CHKSUM+1        update checksum
+        STA     CHKSUM+1
+        BCC     NREAD2         
+        INC     CHKSUM
+NREAD2  DECB         
+        BNE     NREAD1          
+*
+* compare checksums
+        JSR     RCHAR           get checksum msb
+        BCC     NRD_DNR
+        PSHS    A
+        JSR     RCHAR           get checksum lsb
+        BCC     NRD_DNR
+        TFR     A,B            
+        PULS    A               
+        CMPD    CHKSUM          compare checksums
+        BNE     NRD_ERR         if checksum error, then flag crc read error
+*
+        LDA     #ACK            no checksum error, send ACK char
+        JSR     SCHAR
+        BCC     NRD_DNR 
+        CLRB                    all OK, flag no error
+        BRA     NRD_END
+*
+NRD_DNR LDB     #16             flag drive not ready
+        BRA     NRD_END
+*
+NRD_ERR LDA     #NAK            send NAK
+        JSR     SCHAR
+        BCC     NRD_DNR  
+        LDB     #09             flag crc read error
+*
+NRD_END STB     CHKSUM          used by VERIFY
+        TSTB                    
+        RTS
+*
+*
+* write sector to remote drive
+*
+NWRITE  PSHS B
+        PSHS A
+        CLR     CHKSUM          clear checksum
+        CLR     CHKSUM+1
+*	
+        LDA     #'r             Send write sector command
+        JSR     SCHAR
+        BCC     NRD_DNR         if timeout, then flag drive not ready
+*
+        LDA     DRVNUM           send drive
+        JSR     SCHAR
+        BCC     NRD_DNR           
+*
+        PULS    A               send track
+        JSR     SCHAR
+        BCC     NRD_DNR          
+*
+        PULS    A               send sector
+        JSR     SCHAR
+        BCC     NRD_DNR          
+*
+* transfer 256 bytes
+        CLRB                    
+NWRITE1 LDA     0,X+
+        JSR     SCHAR           write byte
+        BCC     NRD_DNR         if timeout, then flag drive not ready
+        ADDA    CHKSUM+1        update checksum
+        STA     CHKSUM+1
+        BCC     NWRITE2         
+        INC     CHKSUM
+NWRITE2 DECB         
+        BNE     NWRITE1          
+*
+* compare checksums
+        LDA     CHKSUM
+        JSR     SCHAR           send checksum msb
+        BCC     NRD_DNR
+        LDA     CHKSUM+1
+        JSR     SCHAR           send checksum lsb
+        BCC     NRD_DNR
+*
+        JSR     RCHAR           get checksum response
+        BCC     NRD_DNR        
+        CMPA    #ACK
+        BNE     NWR_ERR         if checksum error, then flag write error    
+*
+        CLRB                    all OK, flag no error
+        BRA     NWR_END
+*
+NWR_ERR LDB     #10             flag write error
+*
+NWR_END STB     CHKSUM          used by VERIFY
+        TSTB                    
+        RTS
+*
+*
+*   verify last sector written to remote drive
+*
+NVERIFY LDB     CHKSUM         test last checksum
+        TSTB
+        RTS
+*
+*
+*   quck check and check drive ready
+*
+NCHECK  LDA     #'Q             quick check command
+        JSR     SCHAR
+        BCC     NCK_ERR         if timeout, then flag drive not ready
+
+        JSR     RCHAR           get response from host
+        BCC     NCK_ERR
+        CMPA    #ACK
+        BNE     NCK_ERR         if NAK, then flag drive not ready
+
+        CLRB                    all OK, flag drive ready
+        BRA     NCK_END
+*
+NCK_ERR LDB     #16             report drive not ready
+        ORCC    #$01            check needs carry set as well
+*
+NCK_END TSTB
+        RTS
+*
+*
+* recieve char from remote drive.
+* timeout if no response for approx 1s.
+* Entry: no parameters
+* Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+*
+RCHAR   PSHS    X,Y
+*
+        LDX     #1000         1000x inner loop
+RCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+RCHAR2  LDA     ACIAC1        test for recieved char
+        ASRA
+        BCS     RCHAR3        get character
+        LEAY    -1,Y          else, continue to count delay
+        BNE     RCHAR2
+        LEAX    -1,X
+        BNE     RCHAR1
+        PULS    X,Y,PC        return with error if timed out
+*
+RCHAR3  LDA     ACIAD1        return data (carry bit still set)
+        PULS    X,Y,PC
+*
+*
+* transmit char to remote drive.
+* timeout if no response for approx 1s. (allows for use of hardware flow control)
+* Entry: (A) = char to transmit
+* Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+*
+SCHAR   PSHS    X,Y
+        PSHS    A
+*
+        LDX     #1000         1000x inner loop
+SCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+SCHAR2  LDA     ACIAC1        test for space in transmit FIFO
+        ASRA
+        ASRA
+        BCS     SCHAR3        send character
+        LEAY    -1,Y          else, continue to count delay
+        BNE     SCHAR2
+        LEAX    -1,X
+        BNE     SCHAR1
+        PULS    A
+        PULS    X,Y,PC        return with error if timed out
+*
+SCHAR3  PULS    A
+        STA     ACIAD1        send data (carry bit still set)
+        PULS    X,Y,PC
+*
+** 'UF' Format RAMdisc to FLEX standard.
+*
+DISFOS  FCB $0A,$0D 
+        FCC 'Formating RAMdisk... '
+        FCB 4
+MESS6   FCB $0A,$0D,4
+        FCC 'Ramdisk not allocated! '
+	FCB 4
+*
+UFSUB   LDX #DISFOS
+        JSR PDATA1
+        LDX #DTYPTAB		search for allocated ramdisk
+        CLRB
+FMT9    LDA B,X
+        CMPA #DTYPRAM		driver type 1 is ramdisk
+        BEQ FFOUND
+        INCB
+        CMPB #4		end of table? then not allocated.
+        BNE FMT9
+        LDX #MESS6
+        JSR PDATA1
+        RTS
+*
+FFOUND  STB DRVNUM
+        LDX #DRVNUM-3
+        JSR DRVSEL
+*
+* set up free chain
+*
+        LDX #BUFFER clear out buffer
+        CLRA
+        CLRB
+DFL1    STA 0,X+
+        DECB
+        BNE DFL1
+*
+        CLR TRACK
+        LDA #1
+        STA SECTOR
+DFL2    LDX #BUFFER
+        LDA TRACK
+        STA 0,X
+        LDA SECTOR
+        INCA
+        CMPA #RMAXSEC+1 last sector on track?
+        BNE DFL3
+        INC 0,X
+        LDA #1
+DFL3    STA 1,X
+        LDA TRACK
+        LDB SECTOR
+        JSR WRITSC
+        INC SECTOR
+        LDA SECTOR
+        CMPA #RMAXSEC+1
+        BNE DFL2
+        LDA #1
+        STA  SECTOR
+        INC TRACK
+        LDA TRACK
+        CMPA #RMAXTRK
+        BNE DFL2
+* break free chain at last track/sector
+        LDX  #BUFFER
+        LDA  #RMAXTRK-1
+        LDB  #RMAXSEC
+        JSR  READSC
+        LDX  #BUFFER
+        CLR  0,X
+        CLR  1,X
+        LDA  #RMAXTRK-1
+        LDB  #RMAXSEC
+        JSR  WRITSC 
+* set up sector structure, SIR, directory etc
+        LDX  #BUFFER
+        CLRA
+        LDB  #RMAXSEC
+        JSR  READSC
+        LDX  #BUFFER
+        CLR  0,X break end of directory chain
+        CLR  1,X
+        CLRA
+        LDB  #RMAXSEC
+        JSR  WRITSC
+*
+        LDX  #BUFFER
+        CLRA
+        LDB  #3 set up SIR
+        JSR  READSC
+        LDX  #BUFFER
+        CLR  0,X break forward link
+        CLR  1,X
+        LDD  #$5241 set volume name (RAMDISK )
+        STD  16,X
+        LDD  #$4D44
+        STD  18,X
+        LDD  #$4953
+        STD  20,X
+        LDD  #$4B20
+        STD  22,X
+        LDD  #1 volume number
+        STD  27,X
+        LDD  #$0101 first trk/sec  01-01
+        STD  29,X
+        LDA  #RMAXTRK-1
+        LDB  #RMAXSEC
+        STD  31,X
+        STD  38,X
+        LDD  #RTOTSEC total DATA sectors (2912-14)
+        STD  33,X
+*
+        LDA #01 month   set default creation date (SYS09's birthday!)
+        STA 35,X
+        LDA #07 day
+        STA 36,X
+        LDA #07 year
+        STA 37,X
+*
+RF3     CLRA
+        LDB  #3
+        JSR  WRITSC
+*
+        LDX #BUFFER
+        CLRA
+        LDB #1
+        JSR READSC
+        LDX #BUFFER
+        LDA #$AA set the init flag
+        STA 0,X
+        LDA  #$55
+        STA 1,X
+        CLRA
+        LDB #1
+        JMP WRITSC
+*
+********************************
+*    System specific Boot      *
+*    command goes here.        *
+********************************
+*
+* Boot FLEX from the FPGA's internal pre-loaded scratch RAM
+*
+UBMESS  FCB $08, $08
+        FCC 'Booting internal FLEX....'
+        FCB $0D,$0A,$04
+*
+UBSUB   LDX #UBMESS
+        JSR PDATA1
+*
+        LDX #$D3E5
+        LDY #CONTAB Overlay console driver table
+UB1     LDD 0,Y++
+        STD 0,X++
+        CMPX #$D3FD
+        BNE UB1
+*
+        LDX #$DE00 Overlay disk driver table
+        LDY #DISTAB
+UB2     LDD 0,Y++
+        STD 0,X++
+        CMPX #$DE1E
+        BNE UB2
+*
+UBEND   JMP $CD00
+*
+* FLEX console jump table.
+CONTAB  FDB INPNE       INPUT NO ECHO
+        FDB DUMMY       INTERRUPT HANDLER
+        FDB MONRAM+$02 SWI VECTOR
+        FDB MONRAM+$08 IRQ VECTOR
+        FDB DUMMY       TIMER OFF
+        FDB DUMMY       TIMER ON
+        FDB DUMMY       TIMER INITIALIZATION
+        FDB CONTRL      MONITOR
+        FDB DUMMY       TERMINAL INITIALIZATION
+        FDB STATUS      INPUT CHECK
+        FDB OUTP        TERMINAL OUTPUT
+        FDB INPE        TERMINAL INPUT WITH ECHO
+*
+* FLEX disk jump table.
+DISTAB  JMP READSC
+        JMP WRITSC
+        JMP BUSY
+        JMP RESTR1
+        JMP DRVSEL
+        JMP CHKRDY
+        JMP CHKQIK
+        JMP DINIT
+        JMP DWARM
+        JMP SEEKTS
+*
+* Monitor jumps
+*
+PDATA1  JMP [PDATAV]
+OUTP    JMP [OUTCHV]
+INPE    JMP [INCHEV]
+INPNE   JMP [INCHV]
+STATUS  JMP [INCHKV]
+CONTRL  JMP [MONITV]
+DUMMY   RTS
+*
+** 'UL' LOAD ROM DISK VIA SERIAL PORT
+*
+ULMES   FCC  'Serial ROM Disk upload ...'
+        FCB  $0D,$0A,$04
+ULMES1  FCC  'ROM Disk Loaded'
+        FCB  $0D,$0A,$04
+*
+ULSUB   LDX  #ULMES
+        JSR  PDATA1
+*
+        LDA  #$00
+        STA  DRVNUM
+        CLRA         TRACK 0
+        LDB  #$01    SECTOR 1
+ULLOOP0 STA  TRACK
+        STB  SECTOR
+        LBSR MAPIN
+*
+        CLRB  xfer 256 bytes at a time.
+ULLOOP1 JSR  LRBYTE transfer should be hex bytes
+        STA  ,U+
+        DECB
+        BNE  ULLOOP1
+*
+        LBSR MAPOUT
+*
+        LDA  TRACK
+        LDB  SECTOR
+        INCB
+        CMPB #EMAXSEC+1
+        BNE  ULLOOP0
+        LDB  #1
+        INCA
+        CMPA #EMAXTRK
+        BNE  ULLOOP0
+*
+ULEXIT  LDX  #ULMES1
+        JMP  PDATA1
+*
+* Read a byte from the serial port
+*
+LRBYTE  PSHS B
+        BSR  LRHEX                  Get hex digit.
+        ASLA
+        ASLA                           Shift to msb.
+        ASLA
+        ASLA
+        TFR  A,B                    Save in B.
+        BSR  LRHEX                  Get next digit.
+        PSHS B
+        ADDA 0,S+                    Add together bytes.
+        PULS B,PC
+*
+LRHEX   JSR  INTER
+        BVS  LRHEX
+        SUBA #$30                   Remove ascii bias.
+        BMI  LRHEX
+        CMPA #$09                   Number?
+        BLE  LRHEX1                 Yes.
+        CMPA #$11                   Keep testing.
+        BMI  LRHEX
+        CMPA #$16
+        BGT  LRHEX
+        SUBA #$07
+LRHEX1  RTS
+*
+* ACIA INPUT TEST
+*
+INTEST  LDA ACIAC1
+        BITA #$01
+        RTS
+*
+* RESET ACIA
+*
+ACIRST  LDA #$03 master reset
+        STA  ACIAC1
+        LDA #$11
+        STA ACIAC1
+        RTS
+*
+* ACIA INPUT
+*
+INTER   LDA  #16
+        STA  DELCNT+0
+        CLR  DELCNT+1
+        CLR  DELCNT+2
+INTER0  LDA  ACIAC1
+        BITA #$01
+        BNE  INTER1
+        BITA #$78
+        BEQ  INTER2
+        BSR  ACIRST
+        BRA  INTER
+*
+INTER1  LDA  ACIAD1
+        ANDCC #VFLAG
+        RTS
+*
+INTER2  DEC  DELCNT+2
+        BNE  INTER0
+        DEC  DELCNT+1
+        BNE  INTER0
+        DEC  DELCNT+0
+        BNE  INTER0
+        CLRA
+        ORCC #VFLAG
+        RTS
+*
+* ACIA OUTPUT
+*
+OUTTER  PSHS A
+*
+OUTTE1  LDA ACIAC1
+        BITA #$02
+        BNE  OUTTE2
+        BITA #$78
+        BEQ  OUTTE1
+        BSR  ACIRST
+        BRA  OUTTE1
+*
+OUTTE2  PULS A
+        STA ACIAD1
+        RTS
+*
+** 'UX' Xmodem ROM Disk upload
+*
+UXMES   FCB $0D,$0A
+        FCC 'Xmodem ROM Disk Upload'
+        FCB 4
+UXMES1  FCB $0D,$0A
+        FCC 'Upload Complete'
+        FCB 4
+UXMES2  FCB $0D,$0A
+        FCC 'Upload Error'
+        FCB 4
+*
+UXSUB   LDX #UXMES
+        LBSR PDATA1
+*
+        LDA  #1
+        STA BLKNUM
+        LDX  #XSTSTR
+        STX  XSTATE
+*
+        LDA  #$00
+        STA  DRVNUM
+        CLRA         TRACK 0
+        LDB  #$01    SECTOR 1
+UXLOOP0 STA  TRACK
+        STB  SECTOR
+        LBSR MAPIN
+*
+        CLRB       xfer 256 bytes at a time.
+UXLOOP1 LBSR XBYTE transfer should be hex bytes
+        BCS  UXERR
+        STA  ,U+
+        DECB
+        BNE  UXLOOP1
+*
+        LBSR MAPOUT
+*
+        LDA  TRACK
+        LDB  SECTOR
+        INCB
+        CMPB #EMAXSEC+1
+        BNE  UXLOOP0
+        LDB  #1
+        INCA
+        CMPA #EMAXTRK
+        BNE  UXLOOP0
+*
+UXEXIT  LDX  #UXMES1
+        JMP  PDATA1
+*
+UXERR   LBSR MAPOUT
+        LDX  #UXMES2
+        LBRA PDATA1
+*
+* Get a Byte using XModem protocol
+* Carry clear => no errors
+* Carry set   => errors
+*
+XBYTE   PSHS X
+        LDX  XSTATE
+*
+XBYTE0  LBSR INTER
+        BVC  XBYTE1
+        LDA  #NAK
+        LBSR OUTTER
+        LDX  #XSTSTR
+        BRA  XBYTE0
+*
+XBYTE1  JSR  ,X
+        BNE  XBYTE0
+        STX  XSTATE
+        PULS X,PC
+*
+* START - LOOK FOR SOH (START OF HEADER) = $01
+*
+XSTSTR  CMPA #SOH
+        BNE  XSTSTR1
+        LDX  #XSTBLK
+        ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+        RTS
+*
+XSTSTR1 CMPA #EOT
+        BNE  XSTSTR2
+        LDA  #ACK
+        LBSR OUTTER
+        ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+        RTS
+*
+XSTSTR2 CMPA #CAN
+        BNE  XSTSTR3 
+        ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+        RTS
+*
+XSTSTR3 ANDCC #$FF-CFLAG-ZFLAG
+        RTS
+*
+* Got SOH
+* Now get block number
+*
+XSTBLK  CMPA BLKNUM
+        BNE  XSTBLKE
+        LDX  #XSTCOM
+        ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+        RTS
+*
+* Error in block number
+*
+XSTBLKE LDA  #NAK
+        LBSR OUTTER
+        LDX  #XSTSTR
+        ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+        RTS
+*
+* Get complement of block number
+*
+XSTCOM  COMA
+        CMPA BLKNUM
+        BNE  XSTBLKE
+        CLR  CHKSUM
+        LDA  #128
+        STA  BYTCNT
+        LDX  #XSTDAT
+        ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+        RTS
+*
+* Get data bytes
+*
+XSTDAT  PSHS A
+        ADDA CHKSUM
+        STA  CHKSUM
+        PULS A
+        DEC  BYTCNT
+        BNE  XSTDAT1
+        LDX  #XSTCHK
+XSTDAT1 ANDCC #$FF-CFLAG No abort
+        ORCC #ZFLAG      Valid data (exit)
+        RTS
+*
+* Byte count reached zero
+* Check checksum byte
+*
+XSTCHK  CMPA CHKSUM
+        BNE  XSTCHK1 retry if wrong checksum
+*
+* Checksum OK ... 
+* increment block number
+* and send ACK
+*
+        INC  BLKNUM
+        LDA  #ACK
+        BRA  XSTCHK2
+*
+* Checksum Error detected ...
+* Reset Sector counter in ACCB to last 128 byte boundary
+* and send NAK
+*
+XSTCHK1 PSHS B
+        TFR  U,D
+        DECB
+        ANDB #128 
+        TFR  D,U
+        PULS B
+        LDA  #NAK
+XSTCHK2 LBSR OUTTER
+        LDX  #XSTSTR
+        ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+        RTS
+*
+** 'UP' Load ROMdisk via config PROM.
+*
+UPMES   FCB  $08,$08
+        FCC  'Load ROM disk from config PROM.'
+        FCB  4
+UPMES1  FCC  'Found SYNC, loading data...'
+        FCB  $0A,$0D,4
+UPMES2  FCC  'ROM Disk Loaded.'
+        FCB  $0A,$0D,4
+UPMES3  FCC  'ROM Disk Not Found.'
+        FCB  $0A,$0D,4
+*
+UPSUB	LDX  #UPMES
+        JSR  PDATA1
+*
+        BSR  UPRESET
+        LDY  #$0020  Set up count for 2 MBit
+        LDX  #$0000
+UPSUB1  BSR  UPBIT   Shift in bit
+        BSR  UPSYNC  Test for Sync pattern`
+        BEQ  UPSUB4  Skip if found
+        LEAX -1,X    Count Down inner loop
+        CMPX #$0000
+        BNE  UPSUB1   Branch if inner loop not complete
+        LEAY -1,X    Count down outer loop
+        CMPY #$0000
+        BNE  UPSUB1   Branch if outer loop not complete
+*
+        LDX  #UPMES3 2MBits scanned, no synch, report error
+        JMP  PDATA1
+*
+UPSUB4  LDX  #UPMES1 Sync found, now load disk
+        JSR  PDATA1
+*
+        CLRA
+        STA  DRVNUM   select Drive 0
+        LDB  #$01
+UPSUB2  STA  TRACK   track 0
+        STB  SECTOR  sector 1
+*
+        LBSR MAPIN   map in buffer
+        CLRB         256 byte sector
+UPSUB3  BSR  UPBYTE  read byte from prom
+        STA  ,U+     Store in buffer
+        DECB
+        BNE  UPSUB3  Loop until sector read`
+        LBSR MAPOUT  map out buffer
+* 
+        LDA  TRACK   Advance sector
+        LDB  SECTOR
+        INCB
+        CMPB #EMAXSEC+1 Wrap on max sector count
+        BNE  UPSUB2
+        LDB  #1
+        INCA          Advance track
+        CMPA #EMAXTRK
+        BNE  UPSUB2
+*
+UPEXIT  LDX  #UPMES2  Load complete, report message 
+        JMP  PDATA1
+*
+* Reset Serial PROM
+*
+UPRESET LDA  #PRSTHI    Strobe the reset line
+        STA  PROMREG
+        LDA  #PRSTLO
+        STA  PROMREG
+        LDX  #$0000     Delay a while`
+UPRST1  LEAX -1,X
+        CMPX #$0000
+        BNE  UPRST1
+        STX  SYNCREG+0  Clear Sync Shift Register
+        STX  SYNCREG+2
+        RTS
+*
+* Input 1 Bit From PROM
+*
+UPBIT   LDA  #PCLKHI
+        STA  PROMREG
+        LDA  #PCLKLO
+        STA  PROMREG
+        LDA  PROMREG
+        LSRA
+        ASL  SYNCREG+3
+        RTS
+*
+* Test for 32 bit Sync Word
+*
+UPSYNC  ROL  SYNCREG+2
+        ROL  SYNCREG+1
+        ROL  SYNCREG+0
+        LDD  #SYNCLO
+        CMPD SYNCREG+2
+        BNE  UPSYNCX
+        LDD  #SYNCHI
+        CMPD SYNCREG+0
+UPSYNCX RTS
+*
+* Input 1 Byte From PROM
+*
+UPBYTE  PSHS B
+        LDB  #8
+UPBYTE1 BSR  UPBIT
+        DECB
+        BNE  UPBYTE1
+        LDA  SYNCREG+3
+        PULS B,PC 
+* 
+***** NEXTCMD ***** 
+* 
+NEXTEXT LBSR INPE  GET ONE CHAR. FROM TERMINAL 
+        ANDA #$7F STRIP PARITY FROM CHAR. 
+        TFR  A,B
+        LDA  #$20 
+        LBSR OUTP PRNT SPACE 
+        CMPB #$60 
+        BLE NXTEX0 
+        SUBB #$20 
+* 
+***** DO TABLE LOOKUP ***** 
+*   FOR COMMAND FUNCTIONS 
+* 
+NXTEX0  LDX #EXTTAB    POINT TO JUMP TABLE 
+NXTEX1  CMPB ,X+       DOES COMMAND MATCH TABLE ENTRY ? 
+        BEQ  JMPEXT    BRANCH IF MATCH FOUND 
+        LEAX 2,X       POINT TO NEXT ENTRY IN TABLE 
+        CMPX #EXTEND   REACHED END OF TABLE YET ? 
+        BNE  NXTEX1    IF NOT END, CHECK NEXT ENTRY 
+        LDX  #MSGWHAT  POINT TO MSG "WHAT?" 
+        LBRA PDATA1    PRINT MSG AND RETURN
+JMPEXT  JMP  [,X]      JUMP TO COMMAND ROUTINE 
+*
+* EXTENDED COMMAND JUMP TABLE 
+* 
+EXTTAB EQU * 
+       FCC 'B'   BOOT FLEX
+       FDB UBSUB
+       FCC 'L'   LOAD ROM DISK OVER SERIAL PORT
+       FDB ULSUB 
+       FCC 'F'   FORMAT RAM DISK
+       FDB UFSUB 
+       FCC 'P'   LOAD ROM DISK FROM PROM
+       FDB UPSUB 
+       FCC 'X'   XMODEM ROM DISK UPLOAD
+       FDB UXSUB
+* 
+EXTEND EQU * 
+*
+MSGWHAT FCC "WHAT ?"
+        FCB $0A,$0D,$04
+       END

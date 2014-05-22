@@ -1,0 +1,386 @@
+*
+** FLEX 9 DISK DRIVERS
+*
+* FOR SYS09BUG ON THE DIGILENT SPARTAN 3 STARTER BOARD
+* WITH I/O MAPPED AT $XE000
+* AND ROM MAPPED AT $XF000
+* THE DIGILENT SPARTAN 3 STARTER BOARD HAS 1MBYTE OF SRAM
+* THE FIRST 64K IS USED BY FLEX,
+* THE SECOND 128K IS USED AS A ROM DISK
+* THE REMAINING RAM IS USED FOR A RAM DISK
+*
+*
+CFLAG   EQU $01     CARRY FLAG
+VFLAG   EQU $02     OVERFLOW FLAG
+ZFLAG   EQU $04     ZERO FLAG
+NFLAG   EQU $08     NEGATIVE FLAG
+IFLAG   EQU $10     IRQ MASK CC
+HFLAG   EQU $20     HALF CARRY
+FFLAG   EQU $40     FIRQ MASK CC
+EFLAG   EQU $80     ENTIRE FLAG
+*
+MAPPAG  EQU $00     PAGE $0000 DAT ADDRESS
+*
+* Serial Port
+*
+ACIAS   EQU $E000
+ACIAC1  EQU ACIAS
+ACIAD1  EQU ACIAS+1
+DELCON  EQU 1250    Delay (Processor clock in MHz * 50)
+*
+* XMODEM Control characters
+*
+SOH     EQU $01
+EOT     EQU $04
+ACK     EQU $06
+NAK     EQU $15
+CAN     EQU $18
+*
+* ASCII CONTROL CHARACTERS
+*
+HT      EQU $09
+LF      EQU $0A
+CR      EQU $0D
+*
+* Some dummy Constants
+*
+RMAXTRK EQU 48
+RMAXSEC EQU 14
+RTOTSEC EQU RMAXTRK*RMAXSEC-RMAXSEC
+*
+* Start
+*
+        ORG $0100
+START   LBRA  LOAD1
+*
+*
+* RAM SPACE
+*
+CHKSUM  FCB  0
+BLKNUM  FCB  0 Xmodem block number
+BYTCNT  FCB  0 Xmodem byte count
+XSTATE  FDB  0 Xmodem State Vector
+DELCNT  FCB  $00,$00,$00 Xmodem Poll timer
+BUFPTR  FDB 0
+TEXTFL  FCB 0
+LINECT  FCB 0
+        ORG  $0200
+*
+* SECTOR BUFFER
+*
+BUFFER  RMB  256
+*
+*
+* ACIA INPUT TEST
+*
+INTEST  LDA ACIAC1
+        BITA #$01
+        RTS
+*
+* RESET ACIA
+*
+ACIRST  LDA #$03 master reset
+        STA  ACIAC1
+        LDA #$11
+        STA ACIAC1
+        RTS
+*
+* ACIA INPUT
+*
+INTER   LDA  #16
+        STA  DELCNT+0
+        CLR  DELCNT+1
+        CLR  DELCNT+2
+INTER0  LDA  ACIAC1
+        BITA #$01
+        BNE  INTER1
+        BITA #$78
+        BEQ  INTER2
+        BSR  ACIRST
+        BRA  INTER
+*
+INTER1  LDA  ACIAD1
+        ANDCC #VFLAG
+        RTS
+*
+INTER2  DEC  DELCNT+2
+        BNE  INTER0
+        DEC  DELCNT+1
+        BNE  INTER0
+        DEC  DELCNT+0
+        BNE  INTER0
+        CLRA
+        ORCC #VFLAG
+        RTS
+*
+* ACIA OUTPUT
+*
+OUTTER  PSHS A
+*
+OUTTE1  LDA ACIAC1
+        BITA #$02
+        BNE  OUTTE2
+        BITA #$78
+        BEQ  OUTTE1
+        BSR  ACIRST
+        BRA  OUTTE1
+*
+OUTTE2  PULS A
+        STA ACIAD1
+        RTS
+*
+* Print Data
+*
+PDATA0  BSR  OUTTER
+PDATA1  LDA  ,X+
+        CMPA #$04
+        BNE  PDATA0
+        RTS 
+*
+* Get a Byte using XModem protocol
+* Carry clear => no errors
+* Carry set   => errors
+*
+XREAD   PSHS U
+        LDU  XSTATE
+*
+XBYTE0  LBSR INTER
+        BVC  XBYTE1
+        LDA  #NAK
+        LBSR OUTTER
+        LDU  #XSTS
+        BRA  XBYTE0
+*
+XBYTE1  JSR  ,U
+        BNE  XBYTE0
+        STU  XSTATE
+        PULS U,PC
+*
+* START - LOOK FOR SOH (START OF HEADER) = $01
+*
+XSTS  CMPA #SOH
+        BNE  XSTS1
+        LDU  #XSTB
+        ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+        RTS
+*
+XSTS1 CMPA #EOT
+        BNE  XSTS2
+        LDA  #ACK
+        LBSR OUTTER
+        ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+        RTS
+*
+XSTS2 CMPA #CAN
+        BNE  XSTS3
+        ORCC  #CFLAG+ZFLAG  Set (c)=1 abort & exit
+        RTS
+*
+XSTS3 ANDCC #$FF-CFLAG-ZFLAG
+        RTS
+*
+* Got SOH
+* Now get block number
+*
+XSTB  CMPA BLKNUM
+        BNE  XSTBE
+        LDU  #XSTCOM
+        ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+        RTS
+*
+* Error in block number
+*
+XSTBE LDA  #NAK
+        LBSR OUTTER
+        LDU  #XSTS
+        ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+        RTS
+*
+* Get complement of block number
+*
+XSTCOM  COMA
+        CMPA BLKNUM
+        BNE  XSTBE
+        CLR  CHKSUM
+        LDA  #128
+        STA  BYTCNT
+        LDU  #XSTD
+        ANDCC #$FF-CFLAG-ZFLAG No abort, No valid data (no exit)
+        RTS
+*
+* Get data bytes
+*
+XSTD  PSHS A
+        ADDA CHKSUM
+        STA  CHKSUM
+        PULS A
+        DEC  BYTCNT
+        BNE  XSTD1
+        LDU  #XSTC
+XSTD1 STA  ,X+
+        ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+        RTS
+*
+* Byte count reached zero
+* Check checksum byte
+*
+XSTC  CMPA CHKSUM
+        BNE  XSTC1 retry if wrong checksum
+*
+* Checksum OK ... 
+* increment block number
+* Don't send ACK until data written to CF
+*
+        INC  BLKNUM
+        LDU  #XSTS
+        ANDCC #$FF-CFLAG No abort
+        ORCC #ZFLAG      Valid data (exit)
+        RTS
+*
+* Checksum Error detected ...
+* Reset Sector counter in ACCB to last 128 byte boundary
+* and send NAK
+*
+XSTC1  LDX #BUFFER
+        LDA  #NAK
+XSTC2 LBSR OUTTER
+        LDU  #XSTS
+        ANDCC #$FF-CFLAG-ZFLAG No abort, no valid data (no exit)
+        RTS
+*
+* Acknowledge Data Received
+*
+XACK    PSHS A
+        LDA  #ACK
+        LBSR OUTTER
+        PULS A,PC
+*
+** FLEX CALLS
+*
+SYSFCB EQU $C840
+WARMS  EQU $CD03
+OUTCH  EQU $CD0F
+OUTCH2 EQU $CD12
+GETCHR EQU $CD15
+PUTCHR EQU $CD18
+PSTRNG EQU $CD1E
+GETFIL EQU $CD2D
+SETEXT EQU $CD33
+RPTERR EQU $CD3F
+GETHEX EQU $CD42
+NXTCH  EQU $CD27
+FMSCLS EQU $D403
+FMS    EQU $D406
+*
+** MAIN ENTRY POINT
+*
+LOAD1  LDX #SYSFCB
+       JSR >GETFIL
+       BCC LOAD2
+       LDB #$15
+       STB $01,X
+       JMP >FMSERR
+LOAD2  JSR NXTCH
+       ANDA #$5F
+       CMPA #'T
+       BNE LOAD3
+       STA  TEXTFL
+       LDX #TXTMSG
+       JSR PDATA1
+       BRA OPENWR
+LOAD3  CMPA #$20
+       BEQ LOAD2
+*
+** OPEN FILE FOR WRITE
+*
+OPENWR  LDX #SYSFCB
+        LDA #$02
+        STA ,X
+        JSR >FMS
+        LBNE DSKERR
+        TST TEXTFL
+        BEQ OPENW1
+        LDA #$01
+        JSR SETEXT
+        BRA OPENW2
+OPENW1  LDA #$FF
+        STA $3B,X
+OPENW2  EQU *
+*
+        LDU  #XSTS
+        STU  XSTATE
+        LDA  #1
+        STA  BLKNUM
+*
+** WRITE BYTE TO DISK
+*
+WRLOOP LDX #BUFFER
+       LBSR XREAD
+       LBCS ABORT
+       LDX #BUFFER
+       LDB #128
+       STX  BUFPTR
+       STB  BYTCNT
+WRLP1  LDX BUFPTR
+       LDA ,X+
+       STX BUFPTR
+       TST  TEXTFL
+       BEQ  WRLP2
+       CMPA #HT
+       BNE WRLP3
+WRLP4  LDA  #$20
+       LDX #SYSFCB
+       JSR FMS
+       INC LINECT
+       LDA LINECT
+       ANDA #$07
+       BNE WRLP4
+       BRA WRLP5
+WRLP3  CMPA #LF
+       BNE  WRLP2
+       BRA  WRLP3A
+       LDX  #SYSFCB
+       JSR  FMS
+       BNE DSKERR
+       LDA  #CR
+WRLP3A CLR LINECT
+       DEC LINECT
+WRLP2  LDX #SYSFCB
+       JSR >FMS
+       BNE DSKERR
+       INC LINECT
+WRLP5  DEC  BYTCNT
+       BNE  WRLP1
+       LBSR XACK
+       BRA  WRLOOP
+*
+** FINISHED LOAD
+*
+ABORT  LDX #ENDMSG
+       JSR PSTRNG
+       LBSR XACK
+*
+*
+** CLOSE FILE
+*
+CLOSE  LDA #$04
+       LDX #SYSFCB
+       STA ,X
+       JSR >FMS
+       BEQ EXIT
+*
+** ERROR IN CLOSING
+*
+DSKERR LDA $01,X
+FMSERR JSR >RPTERR
+       JSR >FMSCLS
+EXIT   JMP >WARMS
+*
+** MESSAGES
+*
+ENDMSG FCC "FILE LOADED"
+       FCB $04
+TXTMSG FCB $0D,$0A
+       FCC "TEXT FILE"
+       FCB $04
+       END START

@@ -1,0 +1,107 @@
+--  when x"00d" => ascii <= x"09";  -- Horizontal Tab
+--  when x"00e" => ascii <= x"60";  -- `
+--  when x"015" => ascii <= x"71";  -- q
+--  when x"016" => ascii <= x"31";  -- 1
+--  when x"01a" => ascii <= x"7a";  -- z
+--  when x"01b" => ascii <= x"73";  -- s
+--  when x"01c" => ascii <= x"61";  -- a
+--  when x"01d" => ascii <= x"77";  -- w
+--  when x"01e" => ascii <= x"32";  -- 2
+--  when x"021" => ascii <= x"63";  -- c
+--  when x"022" => ascii <= x"78";  -- x
+--  when x"023" => ascii <= x"64";  -- d
+--  when x"024" => ascii <= x"65";  -- e
+--  when x"025" => ascii <= x"34";  -- 4
+--  when x"026" => ascii <= x"33";  -- 3
+--  when x"029" => ascii <= x"20";  -- Space
+--  when x"02a" => ascii <= x"76";  -- v
+--  when x"02b" => ascii <= x"66";  -- f
+--  when x"02c" => ascii <= x"74";  -- t
+--  when x"02d" => ascii <= x"72";  -- r
+--  when x"02e" => ascii <= x"35";  -- 5
+--  when x"031" => ascii <= x"6e";  -- n
+--  when x"032" => ascii <= x"62";  -- b
+--  when x"033" => ascii <= x"68";  -- h
+--  when x"034" => ascii <= x"67";  -- g
+--  when x"035" => ascii <= x"79";  -- y
+--  when x"036" => ascii <= x"36";  -- 6
+--  when x"03a" => ascii <= x"6d";  -- m
+--  when x"03b" => ascii <= x"6a";  -- j
+--  when x"03c" => ascii <= x"75";  -- u
+--  when x"03d" => ascii <= x"37";  -- 7
+--  when x"03e" => ascii <= x"38";  -- 8
+--  when x"041" => ascii <= x"2c";  -- ,
+--  when x"042" => ascii <= x"6b";  -- k
+--  when x"043" => ascii <= x"69";  -- i
+--  when x"044" => ascii <= x"6f";  -- o
+--  when x"045" => ascii <= x"30";  -- 0
+--  when x"046" => ascii <= x"39";  -- 9
+--  when x"04e" => ascii <= x"2d";  -- -
+--  when x"049" => ascii <= x"2e";  -- .
+--  when x"04a" => ascii <= x"2f";  -- /
+--  when x"04b" => ascii <= x"6c";  -- l
+--  when x"04c" => ascii <= x"3b";  -- ;
+--  when x"04d" => ascii <= x"70";  -- p
+--  when x"052" => ascii <= x"27";  --
+--  when x"054" => ascii <= x"5b";  -- [
+--  when x"055" => ascii <= x"3d";  -- =
+--  when x"05a" => ascii <= x"0d";  -- Carriage return ("enter" key)
+--  when x"05b" => ascii <= x"5d";  -- ]
+--  when x"05d" => ascii <= x"5c";  -- \
+--  when x"066" => ascii <= x"08";  -- Backspace ("backspace" key)
+--  when x"071" => ascii <= x"7f";  -- (Delete OR DEL on numeric keypad)
+--  when x"076" => ascii <= x"1b";  -- Escape ("esc" key)
+--  when x"10d" => ascii <= x"09";  -- Horizontal Tab
+--  when x"10e" => ascii <= x"7e";  -- ~
+--  when x"115" => ascii <= x"51";  -- Q
+--  when x"116" => ascii <= x"21";  -- !
+--  when x"11a" => ascii <= x"5a";  -- Z
+--  when x"11b" => ascii <= x"53";  -- S
+--  when x"11c" => ascii <= x"41";  -- A
+--  when x"11d" => ascii <= x"57";  -- W
+--  when x"11e" => ascii <= x"40";  -- @
+--  when x"121" => ascii <= x"43";  -- C
+--  when x"122" => ascii <= x"58";  -- X
+--  when x"123" => ascii <= x"44";  -- D
+--  when x"124" => ascii <= x"45";  -- E
+--  when x"125" => ascii <= x"24";  -- $
+--  when x"126" => ascii <= x"23";  -- #
+--  when x"129" => ascii <= x"20";  -- Space
+--  when x"12a" => ascii <= x"56";  -- V
+--  when x"12b" => ascii <= x"46";  -- F
+--  when x"12c" => ascii <= x"54";  -- T
+--  when x"12d" => ascii <= x"52";  -- R
+--  when x"12e" => ascii <= x"25";  --
+--  when x"131" => ascii <= x"4e";  -- N
+--  when x"132" => ascii <= x"42";  -- B
+--  when x"133" => ascii <= x"48";  -- H
+--  when x"134" => ascii <= x"47";  -- G
+--  when x"135" => ascii <= x"59";  -- Y
+--  when x"136" => ascii <= x"5e";  -- ^
+--  when x"13a" => ascii <= x"4d";  -- M
+--  when x"13b" => ascii <= x"4a";  -- J
+--  when x"13c" => ascii <= x"55";  -- U
+--  when x"13d" => ascii <= x"26";  --
+--  when x"13e" => ascii <= x"2a";  -- *
+--  when x"141" => ascii <= x"3c";  -- <
+--  when x"142" => ascii <= x"4b";  -- K
+--  when x"143" => ascii <= x"49";  -- I
+--  when x"144" => ascii <= x"4f";  -- O
+--  when x"145" => ascii <= x"29";  --
+--  when x"146" => ascii <= x"28";  --
+--  when x"149" => ascii <= x"3e";  -- >
+--  when x"14a" => ascii <= x"3f";  -- ?
+--  when x"14b" => ascii <= x"4c";  -- L
+--  when x"14c" => ascii <= x"3a";  -- :
+--  when x"14d" => ascii <= x"50";  -- P
+--  when x"14e" => ascii <= x"5f";  -- _    
+--  when x"152" => ascii <= x"22";  -- "
+--  when x"154" => ascii <= x"7b";  -- {
+--  when x"155" => ascii <= x"2b";  -- +
+--  when x"15a" => ascii <= x"0d";  -- Carriage return ("enter" key)
+--  when x"15b" => ascii <= x"7d";  -- }
+--  when x"15d" => ascii <= x"7c";  -- |
+--  when x"166" => ascii <= x"08";  -- Backspace ("backspace" key)
+--  when x"171" => ascii <= x"7f";  -- (Delete OR DEL on numeric keypad)
+--  when x"176" => ascii <= x"1b";  -- Escape ("esc" key)
+--  when others => ascii <= x"ff";  -- 0xff used for unlisted characters.

@@ -1,0 +1,720 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         *
+0002                         ** FLEX 9 DISK DRIVERS
+0003                         *
+0004                         * FOR SYS09BUG ON THE DIGILENT SPARTAN 3 STARTER BOARD
+0005                         * WITH I/O MAPPED AT $XE000
+0006                         * AND ROM MAPPED AT $XF000
+0007                         * THE DIGILENT SPARTAN 3 STARTER BOARD HAS 1MBYTE OF SRAM
+0008                         * THE FIRST 64K IS USED BY FLEX,
+0009                         * THE SECOND 128K IS USED AS A ROM DISK
+0010                         * THE REMAINING RAM IS USED FOR A RAM DISK
+0011                         *
+0012                         *
+0013 0001                    CFLAG   EQU $01     CARRY FLAG
+0014 0002                    VFLAG   EQU $02     OVERFLOW FLAG
+0015 0004                    ZFLAG   EQU $04     ZERO FLAG
+0016 0008                    NFLAG   EQU $08     NEGATIVE FLAG
+0017 0010                    IFLAG   EQU $10     IRQ MASK CC
+0018 0020                    HFLAG   EQU $20     HALF CARRY
+0019 0040                    FFLAG   EQU $40     FIRQ MASK CC
+0020 0080                    EFLAG   EQU $80     ENTIRE FLAG
+0021                         *
+0022 0000                    MAPPAG  EQU $00     PAGE $0000 DAT ADDRESS
+0023                         *
+0024                         * Serial Port
+0025                         *
+0026 E000                    ACIAS   EQU $E000
+0027 E000                    ACIAC1  EQU ACIAS
+0028 E001                    ACIAD1  EQU ACIAS+1
+0029 04E2                    DELCON  EQU 1250    Delay (Processor clock in MHz * 50)
+0030                         *
+0031                         * XMODEM Control characters
+0032                         *
+0033 0001                    SOH     EQU $01
+0034 0004                    EOT     EQU $04
+0035 0006                    ACK     EQU $06
+0036 0015                    NAK     EQU $15
+0037 0018                    CAN     EQU $18
+0038                         *
+0039                         * Some dummy Constants
+0040                         *
+0041 0040                    RMAXTRK EQU 64
+0042 00FF                    RMAXSEC EQU 255
+0043 3EC1                    RTOTSEC EQU RMAXTRK*RMAXSEC-RMAXSEC
+0044                         *
+0045                         * Start
+0046                         *
+0047 0100                            ORG $0100
+0048 0100 17 02 98           START   LBSR  UFSUB
+0049 0103 6E 9F F8 00                JMP  [$F800]  Jump to monitor on Completion.
+0050                         *
+0051                         *
+0052                         * RAM SPACE
+0053                         *
+0054 0107 00                 DRVNUM  FCB  0
+0055 0108 00                 TRACK   FCB  0
+0056 0109 00                 SECTOR  FCB  0
+0057 010A 00                 CHKSUM  FCB  0
+0058 010B 00                 BLKNUM  FCB  0 Xmodem block number
+0059 010C 00                 BYTCNT  FCB  0 Xmodem byte count
+0060 010D 00 00              XSTATE  FDB  0 Xmodem State Vector
+0061 010F 00 00 00           DELCNT  FCB  $00,$00,$00 Xmodem Poll timer
+0062 0112 00                 MAXTRK  FCB  0
+0063 0113 00                 MAXSEC  FCB  0
+0064 0200                            ORG  $0200
+0065                         *
+0066                         * SECTOR BUFFER
+0067                         *
+0068 0200                    BUFFER  RMB  256
+0069                         *
+0070                         *
+0071                         * recieve char from remote drive.
+0072                         * timeout if no response for approx 1s.
+0073                         * Entry: no parameters
+0074                         * Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+0075                         *
+0076 0300 34 30              RCHAR   PSHS    X,Y
+0077                         *
+0078 0302 8E 03 E8                   LDX     #1000         1000x inner loop
+0079 0305 10 8E 04 E2        RCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+0080 0309 B6 E0 00           RCHAR2  LDA     ACIAC1        test for recieved char
+0081 030C 47                         ASRA
+0082 030D 25 0A                      BCS     RCHAR3        get character
+0083 030F 31 3F                      LEAY    -1,Y          else, continue to count delay
+0084 0311 26 F6                      BNE     RCHAR2
+0085 0313 30 1F                      LEAX    -1,X
+0086 0315 26 EE                      BNE     RCHAR1
+0087 0317 35 B0                      PULS    X,Y,PC        return with error if timed out
+0088                         *
+0089 0319 B6 E0 01           RCHAR3  LDA     ACIAD1        return data (carry bit still set)
+0090 031C 35 B0                      PULS    X,Y,PC
+0091                         *
+0092                         *
+0093                         * transmit char to remote drive.
+0094                         * timeout if no response for approx 1s. (allows for use of hardware flow control)
+0095                         * Entry: (A) = char to transmit
+0096                         * Exit:  (A) = recieved char, (C)=1 if valid char, (C)=0 if timeout.
+0097                         *
+0098 031E 34 30              SCHAR   PSHS    X,Y
+0099 0320 34 02                      PSHS    A
+0100                         *
+0101 0322 8E 03 E8                   LDX     #1000         1000x inner loop
+0102 0325 10 8E 04 E2        SCHAR1  LDY     #DELCON       delay constant for inner loop (approx 1ms).
+0103 0329 B6 E0 00           SCHAR2  LDA     ACIAC1        test for space in transmit FIFO
+0104 032C 47                         ASRA
+0105 032D 47                         ASRA
+0106 032E 25 0C                      BCS     SCHAR3        send character
+0107 0330 31 3F                      LEAY    -1,Y          else, continue to count delay
+0108 0332 26 F5                      BNE     SCHAR2
+0109 0334 30 1F                      LEAX    -1,X
+0110 0336 26 ED                      BNE     SCHAR1
+0111 0338 35 02                      PULS    A
+0112 033A 35 B0                      PULS    X,Y,PC        return with error if timed out
+0113                         *
+0114 033C 35 02              SCHAR3  PULS    A
+0115 033E B7 E0 01                   STA     ACIAD1        send data (carry bit still set)
+0116 0341 35 B0                      PULS    X,Y,PC
+0117                         *
+0118                         ** 'UF' Format IDE Drive to FLEX standard.
+0119                         *
+0120 0343 0A 0D              DISFOS  FCB $0A,$0D 
+0121 0345 46 6F 72 6D 61 74          FCC 'Formating IDE disk... '
+          69 6E 67 20 49 44
+          45 20 64 69 73 6B
+          2E 2E 2E 20
+0122 035B 0A 0D                      FCB $0A,$0D
+0123 035D 44 72 69 76 65 20          FCC 'Drive Number ?'
+          4E 75 6D 62 65 72
+          20 3F
+0124 036B 04                         FCB 4
+0125 036C 0A 0D 04           MESS6   FCB $0A,$0D,4
+0126 036F 49 44 45 20 64 72          FCC 'IDE drive not allocated! '
+          69 76 65 20 6E 6F
+          74 20 61 6C 6C 6F
+          63 61 74 65 64 21
+          20
+0127 0388 04                 	FCB 4
+0128 0389 0A 0D              UFMSG1  FCB $0A,$0D
+0129 038B 46 6F 72 6D 61 74          FCC 'Format Complete'
+          20 43 6F 6D 70 6C
+          65 74 65
+0130 039A 04                         FCB 4
+0131                         *
+0132 039B BD 05 39           UFSUB   JSR  INITDR
+0133 039E 8E 03 43                   LDX #DISFOS
+0134 03A1 BD 05 32                   JSR PDATA1
+0135 03A4 17 FF 59           UFSUB1  LBSR RCHAR
+0136 03A7 24 FB                      BCC  UFSUB1
+0137 03A9 17 FF 72                   LBSR SCHAR
+0138 03AC 81 30                      CMPA #'0'
+0139 03AE 10 25 00 F3                LBLO UFEXIT
+0140 03B2 81 33                      CMPA #'3'
+0141 03B4 10 22 00 ED                LBHI  UFEXIT
+0142 03B8 80 30                      SUBA #'0'
+0143 03BA 1F 89                      TFR  A,B
+0144 03BC F7 01 07                   STB DRVNUM
+0145 03BF 8E 01 04                   LDX #DRVNUM-3
+0146 03C2 BD 05 B1                   JSR DRVSEL
+0147                         *
+0148                         * set up free chain
+0149                         *
+0150 03C5 8E 02 00                   LDX #BUFFER clear out buffer
+0151 03C8 4F                         CLRA
+0152 03C9 5F                         CLRB
+0153 03CA A7 80              DFL1    STA 0,X+
+0154 03CC 5A                         DECB
+0155 03CD 26 FB                      BNE DFL1
+0156                         *
+0157 03CF 7F 01 08                   CLR TRACK
+0158 03D2 86 01                      LDA #1
+0159 03D4 B7 01 09                   STA SECTOR
+0160 03D7 8E 02 00           DFL2    LDX #BUFFER
+0161 03DA B6 01 08                   LDA TRACK
+0162 03DD A7 84                      STA 0,X
+0163 03DF B6 01 09                   LDA SECTOR
+0164 03E2 4C                         INCA
+0165 03E3 81 00                      CMPA #RMAXSEC+1 last sector on track?
+0166 03E5 26 04                      BNE DFL3
+0167 03E7 6C 84                      INC 0,X
+0168 03E9 86 01                      LDA #1
+0169 03EB A7 01              DFL3    STA 1,X
+0170 03ED B6 01 08                   LDA TRACK
+0171 03F0 F6 01 09                   LDB SECTOR
+0172 03F3 BD 05 8D                   JSR WRITSC
+0173 03F6 7C 01 09                   INC SECTOR
+0174 03F9 B6 01 09                   LDA SECTOR
+0175 03FC 81 00                      CMPA #RMAXSEC+1
+0176 03FE 26 D7                      BNE DFL2
+0177 0400 86 01                      LDA #1
+0178 0402 B7 01 09                   STA  SECTOR
+0179 0405 7C 01 08                   INC TRACK
+0180 0408 B6 01 08                   LDA TRACK
+0181 040B 81 40                      CMPA #RMAXTRK
+0182 040D 26 C8                      BNE DFL2
+0183                         * break free chain at last track/sector
+0184 040F 8E 02 00                   LDX  #BUFFER
+0185 0412 86 3F                      LDA  #RMAXTRK-1
+0186 0414 C6 FF                      LDB  #RMAXSEC
+0187 0416 BD 05 6C                   JSR  READSC
+0188 0419 8E 02 00                   LDX  #BUFFER
+0189 041C 6F 84                      CLR  0,X
+0190 041E 6F 01                      CLR  1,X
+0191 0420 86 3F                      LDA  #RMAXTRK-1
+0192 0422 C6 FF                      LDB  #RMAXSEC
+0193 0424 BD 05 8D                   JSR  WRITSC 
+0194                         * set up sector structure, SIR, directory etc
+0195 0427 8E 02 00                   LDX  #BUFFER
+0196 042A 4F                         CLRA
+0197 042B C6 FF                      LDB  #RMAXSEC
+0198 042D BD 05 6C                   JSR  READSC
+0199 0430 8E 02 00                   LDX  #BUFFER
+0200 0433 6F 84                      CLR  0,X break end of directory chain
+0201 0435 6F 01                      CLR  1,X
+0202 0437 4F                         CLRA
+0203 0438 C6 FF                      LDB  #RMAXSEC
+0204 043A BD 05 8D                   JSR  WRITSC
+0205                         *
+0206 043D 8E 02 00                   LDX  #BUFFER
+0207 0440 4F                         CLRA
+0208 0441 C6 03                      LDB  #3 set up SIR
+0209 0443 BD 05 6C                   JSR  READSC
+0210 0446 8E 02 00                   LDX  #BUFFER
+0211 0449 6F 84                      CLR  0,X break forward link
+0212 044B 6F 01                      CLR  1,X
+0213 044D CC 52 41                   LDD  #$5241 set volume name (RAMDISK )
+0214 0450 ED 88 10                   STD  16,X
+0215 0453 CC 4D 44                   LDD  #$4D44
+0216 0456 ED 88 12                   STD  18,X
+0217 0459 CC 49 53                   LDD  #$4953
+0218 045C ED 88 14                   STD  20,X
+0219 045F CC 4B 20                   LDD  #$4B20
+0220 0462 ED 88 16                   STD  22,X
+0221 0465 CC 00 01                   LDD  #1 volume number
+0222 0468 ED 88 1B                   STD  27,X
+0223 046B CC 01 01                   LDD  #$0101 first trk/sec  01-01
+0224 046E ED 88 1D                   STD  29,X
+0225 0471 86 3F                      LDA  #RMAXTRK-1
+0226 0473 C6 FF                      LDB  #RMAXSEC
+0227 0475 ED 88 1F                   STD  31,X
+0228 0478 ED 88 26                   STD  38,X
+0229 047B CC 3E C1                   LDD  #RTOTSEC total DATA sectors (2912-14)
+0230 047E ED 88 21                   STD  33,X
+0231                         *
+0232 0481 86 01                      LDA #01 month   set default creation date (SYS09's birthday!)
+0233 0483 A7 88 23                   STA 35,X
+0234 0486 86 07                      LDA #07 day
+0235 0488 A7 88 24                   STA 36,X
+0236 048B 86 07                      LDA #07 year
+0237 048D A7 88 25                   STA 37,X
+0238                         *
+0239 0490 4F                 RF3     CLRA
+0240 0491 C6 03                      LDB  #3
+0241 0493 BD 05 8D                   JSR  WRITSC
+0242                         *
+0243                         * Not sure what this is about
+0244                         * put bootstrap on track 0 sector 1
+0245                         *
+0246                         *        LDX #BUFFER
+0247                         *        CLRA
+0248                         *        LDB #1
+0249                         *        JSR READSC
+0250                         *        LDX #BUFFER
+0251                         *        LDA #$AA set the init flag
+0252                         *        STA 0,X
+0253                         *        LDA  #$55
+0254                         *        STA 1,X
+0255                         *        CLRA
+0256                         *        LDB #1
+0257                         *        JSR WRITSC
+0258                         *
+0259                         *  Write Boot sector
+0260                         *
+0261 0496 8E C0 00                   LDX  #$C000
+0262 0499 4F                         CLRA         TRACK 0
+0263 049A C6 01                      LDB  #$01    SECTOR 1
+0264 049C B7 01 08                   STA  TRACK
+0265 049F F7 01 09                   STB  SECTOR
+0266 04A2 17 00 E8                   LBSR WRITSC
+0267                         *
+0268 04A5 8E 03 89           UFEXIT  LDX #UFMSG1
+0269 04A8 7E 05 32                   JMP PDATA1
+0270                         *
+0271                         * Read a byte from the serial port
+0272                         *
+0273 04AB 34 04              LRBYTE  PSHS B
+0274 04AD 8D 0E                      BSR  LRHEX                  Get hex digit.
+0275 04AF 48                         ASLA
+0276 04B0 48                         ASLA                           Shift to msb.
+0277 04B1 48                         ASLA
+0278 04B2 48                         ASLA
+0279 04B3 1F 89                      TFR  A,B                    Save in B.
+0280 04B5 8D 06                      BSR  LRHEX                  Get next digit.
+0281 04B7 34 04                      PSHS B
+0282 04B9 AB E0                      ADDA 0,S+                    Add together bytes.
+0283 04BB 35 84                      PULS B,PC
+0284                         *
+0285 04BD BD 04 E6           LRHEX   JSR  INTER
+0286 04C0 29 FB                      BVS  LRHEX
+0287 04C2 80 30                      SUBA #$30                   Remove ascii bias.
+0288 04C4 2B F7                      BMI  LRHEX
+0289 04C6 81 09                      CMPA #$09                   Number?
+0290 04C8 2F 0A                      BLE  LRHEX1                 Yes.
+0291 04CA 81 11                      CMPA #$11                   Keep testing.
+0292 04CC 2B EF                      BMI  LRHEX
+0293 04CE 81 16                      CMPA #$16
+0294 04D0 2E EB                      BGT  LRHEX
+0295 04D2 80 07                      SUBA #$07
+0296 04D4 39                 LRHEX1  RTS
+0297                         *
+0298                         * ACIA INPUT TEST
+0299                         *
+0300 04D5 B6 E0 00           INTEST  LDA ACIAC1
+0301 04D8 85 01                      BITA #$01
+0302 04DA 39                         RTS
+0303                         *
+0304                         * RESET ACIA
+0305                         *
+0306 04DB 86 03              ACIRST  LDA #$03 master reset
+0307 04DD B7 E0 00                   STA  ACIAC1
+0308 04E0 86 11                      LDA #$11
+0309 04E2 B7 E0 00                   STA ACIAC1
+0310 04E5 39                         RTS
+0311                         *
+0312                         * ACIA INPUT
+0313                         *
+0314 04E6 86 10              INTER   LDA  #16
+0315 04E8 B7 01 0F                   STA  DELCNT+0
+0316 04EB 7F 01 10                   CLR  DELCNT+1
+0317 04EE 7F 01 11                   CLR  DELCNT+2
+0318 04F1 B6 E0 00           INTER0  LDA  ACIAC1
+0319 04F4 85 01                      BITA #$01
+0320 04F6 26 08                      BNE  INTER1
+0321 04F8 85 78                      BITA #$78
+0322 04FA 27 0A                      BEQ  INTER2
+0323 04FC 8D DD                      BSR  ACIRST
+0324 04FE 20 E6                      BRA  INTER
+0325                         *
+0326 0500 B6 E0 01           INTER1  LDA  ACIAD1
+0327 0503 1C 02                      ANDCC #VFLAG
+0328 0505 39                         RTS
+0329                         *
+0330 0506 7A 01 11           INTER2  DEC  DELCNT+2
+0331 0509 26 E6                      BNE  INTER0
+0332 050B 7A 01 10                   DEC  DELCNT+1
+0333 050E 26 E1                      BNE  INTER0
+0334 0510 7A 01 0F                   DEC  DELCNT+0
+0335 0513 26 DC                      BNE  INTER0
+0336 0515 4F                         CLRA
+0337 0516 1A 02                      ORCC #VFLAG
+0338 0518 39                         RTS
+0339                         *
+0340                         * ACIA OUTPUT
+0341                         *
+0342 0519 34 02              OUTTER  PSHS A
+0343                         *
+0344 051B B6 E0 00           OUTTE1  LDA ACIAC1
+0345 051E 85 02                      BITA #$02
+0346 0520 26 08                      BNE  OUTTE2
+0347 0522 85 78                      BITA #$78
+0348 0524 27 F5                      BEQ  OUTTE1
+0349 0526 8D B3                      BSR  ACIRST
+0350 0528 20 F1                      BRA  OUTTE1
+0351                         *
+0352 052A 35 02              OUTTE2  PULS A
+0353 052C B7 E0 01                   STA ACIAD1
+0354 052F 39                         RTS
+0355                         *
+0356                         * Print Data
+0357                         *
+0358 0530 8D E7              PDATA0  BSR  OUTTER
+0359 0532 A6 80              PDATA1  LDA  ,X+
+0360 0534 81 04                      CMPA #$04
+0361 0536 26 F8                      BNE  PDATA0
+0362 0538 39                         RTS 
+0363                         *
+0364                         ** FLEX 9 IDE DISK DRIVERS
+0365                         *
+0366                         * FOR SYS09BUG 1.2 ON THE XSA-3S1000
+0367                         * WITH I/O MAPPED AT $XE000
+0368                         * AND ROM MAPPED AT $XF000
+0369                         *
+0370                         *
+0371 0010                    IMASK  EQU $10     IRQ MASK CC
+0372 0040                    FMASK  EQU $40     FIRQ MASK CC
+0373                         *
+0374 E100                    CF_BASE    EQU $E100
+0375 E100                    CF_DATA    EQU CF_BASE+0
+0376 E102                    CF_ERROR   EQU CF_BASE+2 ; read error
+0377 E102                    CF_FEATURE EQU CF_BASE+2 ; write feature
+0378 E104                    CF_SCNT    EQU CF_BASE+4
+0379 E106                    CF_SNUM    EQU CF_BASE+6
+0380 E108                    CF_CLO     EQU CF_BASE+8
+0381 E10A                    CF_CHI     EQU CF_BASE+10
+0382 E10C                    CF_HEAD    EQU CF_BASE+12
+0383 E10E                    CF_STATUS  EQU CF_BASE+14 ; read status
+0384 E10E                    CF_COMAND  EQU CF_BASE+14 ; write command
+0385 E11E                    CF_AUX     EQU CF_BASE+30
+0386                         *
+0387                         * Command Equates
+0388                         *
+0389 0020                    CMDREAD    EQU $20 ; Read Single sector
+0390 0030                    CMDWRITE   EQU $30 ; Write Single sector
+0391 0006                    AUXRESET   EQU $06
+0392 0002                    AUXRSTREL  EQU $02
+0393 00E0                    HEADLBA    EQU $E0
+0394                         *
+0395                         * Status bit equates
+0396                         *
+0397 0080                    BSY        EQU $80
+0398 0040                    DRDY       EQU $40
+0399 0008                    DRQ        EQU $08
+0400 0001                    ERR        EQU $01
+0401                         *
+0402                         *
+0403                         * INITIALIZE CF CARD FOR 8 BIT LBA MODE
+0404                         *
+0405 0539 CC 00 06           INITDR LDD #AUXRESET
+0406 053C FD E1 1E                  STD CF_AUX
+0407 053F CC 00 02                  LDD #AUXRSTREL
+0408 0542 FD E1 1E                  STD CF_AUX
+0409 0545 CC 00 E0                  LDD  #HEADLBA
+0410 0548 FD E1 0C                  STD  CF_HEAD
+0411 054B 20 74                     BRA WAITRDY
+0412                         *  
+0413                         * RESTORE DISK DRIVER (SEEK TRACK 00)
+0414                         *  
+0415 054D 8D 62              RESTR1 BSR   DRVSEL
+0416 054F 4F                        CLRA           ; Track 0
+0417 0550 C6 01                     LDB   #$01     ; Sector 1
+0418                         *
+0419                         * Seek track and sector
+0420                         * A holds track number (0 - ??)
+0421                         * B holds sector number (1 - ??)
+0422                         * Sector numbers starts from 1
+0423                         * subtract 1 to start from sector 0 on CF
+0424                         *
+0425 0552 34 02              SEEKTS PSHS A
+0426 0554 4F                        CLRA
+0427 0555 5A                        DECB
+0428 0556 FD E1 06                  STD  CF_SNUM
+0429 0559 E6 E4                     LDB ,S
+0430 055B FD E1 08                  STD  CF_CLO
+0431 055E F6 01 07                  LDB  DRVNUM
+0432 0561 FD E1 0A                  STD  CF_CHI
+0433 0564 C6 01                     LDB  #$01
+0434 0566 FD E1 04                  STD  CF_SCNT
+0435 0569 5F                        CLRB
+0436 056A 35 82                     PULS A,PC
+0437                         *
+0438                         * READ SECTORS FROM CF
+0439                         *
+0440                         *
+0441 056C 8D E4              READSC BSR  SEEKTS
+0442 056E CC 00 20                  LDD  #CMDREAD ; IDE READ MULTIPLE
+0443 0571 FD E1 0E                  STD  CF_COMAND
+0444 0574 8D 4B                     BSR  WAITRDY
+0445                         *
+0446                         * READ LOOP
+0447                         *
+0448 0576 34 20                     PSHS Y
+0449 0578 10 8E 01 00               LDY #256
+0450 057C 8D 52              RDLP1  BSR  WAITDRQ
+0451 057E FC E1 00                  LDD  CF_DATA
+0452 0581 E7 80                     STB  ,X+
+0453 0583 31 3F                     LEAY -1,Y
+0454 0585 26 F5                     BNE  RDLP1
+0455 0587 35 20                     PULS Y
+0456                         *
+0457 0589 8D 36                     BSR  WAITRDY
+0458 058B 5F                        CLRB
+0459 058C 39                        RTS
+0460                         *  
+0461                         * WRITE SECTOR TO CF
+0462                         *  
+0463 058D 8D C3              WRITSC BSR  SEEKTS   ; SEEK TRACK & SECTOR
+0464 058F CC 00 30                  LDD  #CMDWRITE ; IDE WRITE MULTIPLE
+0465 0592 FD E1 0E                  STD  CF_COMAND
+0466 0595 8D 2A                     BSR  WAITRDY
+0467                         *
+0468                         * WRITE LOOP
+0469                         *
+0470 0597 34 20                     PSHS Y
+0471 0599 10 8E 01 00               LDY #256
+0472 059D 4F                        CLRA
+0473 059E 8D 30              WRTLP1 BSR  WAITDRQ
+0474 05A0 E6 80                     LDB  ,X+
+0475 05A2 FD E1 00                  STD  CF_DATA
+0476 05A5 31 3F                     LEAY -1,Y
+0477 05A7 26 F5                     BNE  WRTLP1
+0478 05A9 35 20                     PULS Y
+0479                         *
+0480 05AB 8D 14                     BSR  WAITRDY
+0481 05AD 5F                        CLRB
+0482 05AE 39                        RTS
+0483                         *  
+0484                         * CHECK FOR BUSY  
+0485                         * Doubles as VERIFY
+0486                         *  
+0487 05AF 5F                 BUSY   CLRB            Never busy
+0488 05B0 39                        RTS
+0489                         *  
+0490                         * DRIVE SELECT DISK DRIVER
+0491                         *  
+0492 05B1 A6 03              DRVSEL LDA   3,X       GET DRIVE # FROM FCB
+0493 05B3 81 03                     CMPA  #3  
+0494 05B5 23 01                     BLS   DRVS2     IF > 3, SET IT TO 0  
+0495 05B7 4F                        CLRA  
+0496 05B8 B7 01 07           DRVS2  STA   DRVNUM
+0497 05BB 5F                        CLRB            ; SET Z, CLEAR C
+0498 05BC 39                        RTS
+0499                         *  
+0500                         * CHECK DRIVE READY DISK DRIVER
+0501                         *  
+0502 05BD A6 03              CHKDRV LDA  3,X
+0503 05BF 5F                        CLRB             ; CLEAR C, SET Z
+0504 05C0 39                        RTS  
+0505                         *
+0506                         * WAIT UNTIL READY
+0507                         *
+0508 05C1 FC E1 0E           WAITRDY LDD  CF_STATUS
+0509 05C4 C5 80                      BITB #BSY
+0510 05C6 26 F9                      BNE  WAITRDY
+0511 05C8 FC E1 0E                   LDD  CF_STATUS
+0512 05CB C5 40                      BITB #DRDY
+0513 05CD 27 F2                      BEQ  WAITRDY
+0514 05CF 39                         RTS
+0515                         *
+0516                         * WAIT FOR DATA REQUEST
+0517                         *
+0518 05D0 FC E1 0E           WAITDRQ LDD  CF_STATUS
+0519 05D3 C5 08                      BITB #DRQ
+0520 05D5 27 F9                      BEQ  WAITDRQ
+0521 05D7 39                         RTS
+0522                         *
+0523                         *******************************************************
+0524                         *
+0525                         * Bootstrap FLEX Loader
+0526                         *
+0527                         * SBUG1.8 loads the bootstap loader at $C000
+0528                         * however the Flex adaption manual has the
+0529                         * bootstrap loader residing at $C100
+0530                         *
+0531                         ******************************************************
+0532                         *
+0533                         * Equates
+0534                         *
+0535 C0FF                    STACK   EQU $C0FF
+0536 C300                    SCTBUF  EQU $C300
+0537                         *
+0538                         * Start of Utility
+0539                         *
+0540 C000                            ORG $C000
+0541 C000 20 0B              BOOT    BRA LOAD0
+0542 C002 00 00 00                   FCB 0,0,0
+0543 C005 00                 TRK     FCB 0        File start track
+0544 C006 00                 SCT     FCB 0        File start sector
+0545 C007 00                 DNS     FCB 0        Density Flag (not used)
+0546 C008 C0 00              TADR    FDB $C000    Transfer address
+0547 C00A 00 00              LADR    FDB 0        Load Address
+0548 C00C 00                 DRNUM   FCB 0        Drive number 0
+0549                         *
+0550 C00D 10 CE C0 FF        LOAD0   LDS  #STACK   Set up stack
+0551 C011 FC C0 05                   LDD  TRK      Set up start track and sector
+0552 C014 FD C3 00                   STD  SCTBUF
+0553 C017 10 8E C4 00                LDY  #SCTBUF+256
+0554                         *
+0555                         * Perform actual file load
+0556                         *
+0557 C01B 8D 35              LOAD1   BSR GETCH    Get acharcater
+0558 C01D 81 02                      CMPA #$02    Data record hearder ?
+0559 C01F 27 10                      BEQ  LOAD2   Skip, is so
+0560 C021 81 16                      CMPA #$16    Xfr address hearder ?
+0561 C023 26 F6                      BNE LOAD1    Loop if neither
+0562                         *
+0563                         * Get transfer address
+0564                         *
+0565 C025 8D 2B                      BSR  GETCH
+0566 C027 B7 C0 08                   STA  TADR
+0567 C02A 8D 26                      BSR  GETCH
+0568 C02C B7 C0 09                   STA  TADR+1
+0569 C02F 20 EA                      BRA  LOAD1
+0570                         *
+0571                         * Load data record
+0572                         *
+0573 C031 8D 1F              LOAD2  BSR  GETCH  Get load address
+0574 C033 B7 C0 0A                  STA  LADR
+0575 C036 8D 1A                     BSR  GETCH
+0576 C038 B7 C0 0B                  STA  LADR+1
+0577 C03B 8D 15                     BSR  GETCH  Get Bytes count
+0578 C03D 1F 89                     TFR  A,B
+0579 C03F 5D                        TSTB
+0580 C040 27 D9                     BEQ  LOAD1 Loop if count = 0
+0581 C042 BE C0 0A                  LDX  LADR  Get load address
+0582 C045 34 14              LOAD3  PSHS B,X
+0583 C047 8D 09                     BSR  GETCH  Get data character
+0584 C049 35 14                     PULS B,X
+0585 C04B A7 80                     STA  ,X+    Store at load address
+0586 C04D 5A                        DECB
+0587 C04E 26 F5                     BNE  LOAD3  Loop until count = 0
+0588 C050 20 C9                     BRA  LOAD1
+0589                         *
+0590                         * Get Character routine
+0591                         * Reads a sector if needed
+0592                         *
+0593 C052 10 8C C4 00        GETCH  CMPY #SCTBUF+256 out of data ?
+0594 C056 26 0F                     BNE  GETCH4      Go read Character if not
+0595 C058 8E C3 00           GETCH2 LDX  #SCTBUF     Point to buffer
+0596 C05B EC 84                     LDD  0,X         Get forward Link
+0597 C05D 27 0B                     BEQ  GO          if zero, file is loaded
+0598 C05F 8D 27                     BSR  READ        Read next sector
+0599 C061 26 9D                     BNE  BOOT        start over if error
+0600 C063 10 8E C3 04               LDY  #SCTBUF+4   Point past link
+0601 C067 A6 A0              GETCH4 LDA  ,Y+         Else, get a character
+0602 C069 39                        RTS
+0603                         *
+0604                         * File is loaded, Jump to it
+0605                         *
+0606 C06A 6E 9F C0 08        GO     JMP  [TADR]      Jump to transfer address
+0607                         
+0608                         *
+0609                         ** FLEX 9 IDE DISK DRIVERS
+0610                         *
+0611                         * FOR SYS09BUG 1.2 ON THE XSA-3S1000
+0612                         * WITH I/O MAPPED AT $XE000
+0613                         * AND ROM MAPPED AT $XF000
+0614                         *
+0615                         *IMASK  EQU $10     IRQ MASK CC
+0616                         *FMASK  EQU $40     FIRQ MASK CC
+0617                         *
+0618                         *CF_BASE    EQU $E100
+0619                         *CF_DATA    EQU CF_BASE+0
+0620                         *CF_ERROR   EQU CF_BASE+2 ; read error
+0621                         *CF_FEATURE EQU CF_BASE+2 ; write feature
+0622                         *CF_SCNT  EQU CF_BASE+4
+0623                         *CF_SNUM  EQU CF_BASE+6
+0624                         *CF_CLO   EQU CF_BASE+8
+0625                         *CF_CHI   EQU CF_BASE+10
+0626                         *CF_HEAD    EQU CF_BASE+12
+0627                         *CF_STATUS  EQU CF_BASE+14 ; read status
+0628                         *CF_COMAND  EQU CF_BASE+14 ; write command
+0629                         *CF_AUX     EQU CF_BASE+30
+0630                         *
+0631                         * Command Equates
+0632                         *
+0633                         *CMDREAD    EQU $20 ; Read Single sector
+0634                         *CMDWRITE   EQU $30 ; Write Single sector
+0635                         *HEADLBA    EQU $E0
+0636                         *AUXRESET   EQU $06
+0637                         *AUXRSTREL  EQU $02
+0638                         *
+0639                         * Status bit equates
+0640                         *
+0641                         *BSY        EQU $80
+0642                         *DRDY       EQU $40
+0643                         *DRQ        EQU $08
+0644                         *ERR        EQU $01
+0645                         *
+0646                         * Seek track and sector
+0647                         * A holds track number (0 - ??)
+0648                         * B holds sector number (1 - ??)
+0649                         * Sector numbers starts from 1
+0650                         * subtract 1 to start from sector 0 on CF
+0651                         *
+0652 C06E 34 02              SEEK   PSHS A
+0653 C070 4F                        CLRA
+0654 C071 5A                        DECB
+0655 C072 FD E1 06                  STD  CF_SNUM
+0656 C075 E6 E4                     LDB  ,S
+0657 C077 FD E1 08                  STD  CF_CLO
+0658 C07A F6 C0 0C                  LDB  DRNUM
+0659 C07D FD E1 0A                  STD  CF_CHI
+0660 C080 C6 01                     LDB  #$01
+0661 C082 FD E1 04                  STD  CF_SCNT
+0662 C085 5F                        CLRB
+0663 C086 35 82                     PULS A,PC 
+0664                         *
+0665                         * READ SECTORS FROM CF
+0666                         *
+0667                         *
+0668 C088 8D E4              READ   BSR  SEEK
+0669 C08A CC 00 20                  LDD  #CMDREAD ; IDE READ MULTIPLE
+0670 C08D FD E1 0E                  STD  CF_COMAND
+0671 C090 8D 17                     BSR  WTRDY
+0672                         *
+0673                         * READ LOOP
+0674                         *
+0675 C092 34 20                     PSHS Y
+0676 C094 10 8E 01 00               LDY #256
+0677 C098 8D 1E              READ1  BSR  WTDRQ
+0678 C09A FC E1 00                  LDD  CF_DATA
+0679 C09D E7 80                     STB  ,X+
+0680 C09F 31 3F                     LEAY -1,Y
+0681 C0A1 26 F5                     BNE  READ1
+0682 C0A3 35 20                     PULS Y
+0683                         *
+0684 C0A5 8D 02                     BSR  WTRDY
+0685 C0A7 5F                        CLRB
+0686 C0A8 39                        RTS
+0687                         *
+0688                         * WAIT UNTIL READY
+0689                         *
+0690 C0A9 FC E1 0E           WTRDY   LDD  CF_STATUS
+0691 C0AC C5 80                      BITB #BSY
+0692 C0AE 26 F9                      BNE  WTRDY
+0693 C0B0 FC E1 0E                   LDD  CF_STATUS
+0694 C0B3 C5 40                      BITB #DRDY
+0695 C0B5 27 F2                      BEQ  WTRDY
+0696 C0B7 39                         RTS
+0697                         *
+0698                         * WAIT FOR DATA REQUEST
+0699                         *
+0700 C0B8 FC E1 0E           WTDRQ   LDD  CF_STATUS
+0701 C0BB C5 08                      BITB #DRQ
+0702 C0BD 27 F9                      BEQ  WTDRQ
+0703 C0BF 39                         RTS
+0704                         *
+0705                                END START
+Program + Init Data = 940 bytes
+Error count = 0

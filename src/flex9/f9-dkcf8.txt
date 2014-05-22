@@ -1,0 +1,189 @@
+*
+** FLEX 9 COMPACT FLASH DISK DRIVERS
+*
+* FOR SYS09BUG 1.2 ON THE BURCHED B5-X300
+* WITH I/O MAPPED AT $XE000
+* AND ROM MAPPED AT $XF000
+* THE BURCHED B5-X300 HAS 256KBYTES OF SRAM
+* THE FIRST 64K IS USED BY FLEX,
+* THE SECOND 192K MAY BE USED AS A RAM DISK
+*
+*
+IMASK  EQU $10     IRQ MASK CC
+FMASK  EQU $40     FIRQ MASK CC
+DATREG EQU $FFF0   DAT REGISTERS
+*
+CF_BASE    EQU $E040
+CF_DATA    EQU CF_BASE+0
+CF_ERROR   EQU CF_BASE+1 ; read error
+CF_FEATURE EQU CF_BASE+1 ; write feature
+CF_SECCNT  EQU CF_BASE+2
+CF_SECNUM  EQU CF_BASE+3
+CF_CYLLO   EQU CF_BASE+4
+CF_CYLHI   EQU CF_BASE+5
+CF_HEAD    EQU CF_BASE+6
+CF_STATUS  EQU CF_BASE+7 ; read status
+CF_COMAND  EQU CF_BASE+7 ; write command
+*
+* Command Equates
+*
+CMDREAD    EQU $20 ; Read Single sector
+CMDWRITE   EQU $30 ; Write Single sector
+CMDFEATURE EQU $EF
+FEAT8BIT   EQU $01 ; enable 8 bit transfers
+HEADLBA    EQU $E0
+*
+* Status bit equates
+*
+BSY        EQU $80
+DRDY       EQU $40
+DRQ        EQU $08
+ERR        EQU $01
+       ORG   $DE00
+*  
+* DISK DRIVER JUMP TABLE
+*
+READ   JMP   READSC
+WRITE  JMP   WRITSC
+VERIFY JMP   BUSY
+RESTOR JMP   RESTR1
+DRIVE  JMP   DRVSEL
+DRVRDY JMP   CHKDRV
+QUICK  JMP   CHKDRV
+COLDDR JMP   INITDR
+WARMDR JMP   WARMD1
+SEEK   JMP   SEEKTS
+*
+* RAM SPACE
+*
+DRVNUM FCB   0  
+*
+*
+* INITIALIZE CF CARD FOR 8 BIT LBA MODE
+*
+INITDR BSR WAITRDY
+       LDA  #HEADLBA
+       STA  CF_HEAD
+       LDA #FEAT8BIT
+       STA CF_FEATURE
+       LDA #CMDFEATURE
+       STA CF_COMAND
+       BRA WAITRDY
+*  
+* RESTORE DISK DRIVER (SEEK TRACK 00)
+*  
+RESTR1 BSR   DRVSEL
+       CLRA           ; Track 0
+       LDB   #$01     ; Sector 1
+*
+* Seek track and sector
+* A holds track number (0 - ??)
+* B holds sector number (1 - ??)
+* Sector numbers starts from 1
+* subtract 1 to start from sector 0 on CF
+*
+SEEKTS DECB
+       STB  CF_SECNUM
+       STA  CF_CYLLO
+       LDB  DRVNUM
+       STB  CF_CYLHI
+       LDB  #$01
+       STB  CF_SECCNT
+       CLRB
+WARMD1 RTS
+*
+* READ SECTORS FROM CF
+*
+*
+READSC BSR  SEEKTS
+       LDA  #CMDREAD ; IDE READ MULTIPLE
+       STA  CF_COMAND
+       BSR  WAITRDY
+*
+* READ LOOP
+*
+       CLRB
+RDLP1  BSR  WAITDRQ
+       LDA  CF_DATA
+       STA  ,X+
+       DECB
+       BNE  RDLP1
+*
+       CLRB
+RDLP2  BSR  WAITDRQ
+       LDA  CF_DATA
+       DECB
+       BNE  RDLP2
+*
+       BSR  WAITRDY
+       CLRB
+       RTS
+*  
+* WRITE SECTOR TO CF
+*  
+WRITSC BSR  SEEKTS   ; SEEK TRACK & SECTOR
+       LDA  #CMDWRITE; IDE WRITE MULTIPLE
+       STA  CF_COMAND
+       BSR  WAITRDY
+*
+* WRITE LOOP
+*
+       CLRB
+WRTLP1 BSR  WAITDRQ
+       LDA  ,X+
+       STA  CF_DATA
+       DECB
+       BNE  WRTLP1
+*
+       CLRB
+WRTLP2 BSR  WAITDRQ
+       CLRA
+       STA  CF_DATA
+       DECB
+       BNE WRTLP2
+*
+       BSR  WAITRDY
+       CLRB
+       RTS
+*  
+* CHECK FOR BUSY  
+* Doubles as VERIFY
+*  
+BUSY   CLRB            Never busy
+       RTS
+*  
+* DRIVE SELECT DISK DRIVER
+*  
+DRVSEL LDA   3,X       GET DRIVE # FROM FCB
+       CMPA  #3  
+       BLS   DRVS2     IF > 3, SET IT TO 0  
+       CLRA  
+DRVS2  STA   DRVNUM
+       CLRB            ; SET Z, CLEAR C
+       RTS
+*  
+* CHECK DRIVE READY DISK DRIVER
+*  
+CHKDRV LDA  3,X
+       CLRB             ; CLEAR C, SET Z
+       RTS  
+*
+* WAIT UNTIL READY
+*
+WAITRDY LDA  CF_STATUS
+        BITA #BSY
+        BNE  WAITRDY
+        LDA  CF_STATUS
+        BITA #DRDY
+        BEQ  WAITRDY
+        RTS
+*
+* WAIT FOR DATA REQUEST
+*
+WAITDRQ LDA  CF_STATUS
+        BITA #DRQ
+        BEQ  WAITDRQ
+        RTS
+*
+        END
+

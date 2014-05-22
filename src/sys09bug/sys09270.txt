@@ -1,0 +1,5 @@
+ NAM SYS09BUG FOR TERASIC CYCLONE II DE2-70 
+ INCLUDE "opt_270.txt"
+ INCLUDE "sys09equ.txt"
+ INCLUDE "sys09bug.txt"
+ END 

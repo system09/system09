@@ -1,0 +1,6 @@
+ NAM SYS09BUG FOR THE B3-Spartan2+
+ INCLUDE "opt_b3s.txt"
+ INCLUDE "sys09equ.txt"
+ INCLUDE "sys09ide.txt"
+ INCLUDE "sys09bug.txt"
+ END 

@@ -1,0 +1,170 @@
+#####################################################
+#
+# XuLA Board FPGA pin assignment constraints
+#
+#####################################################
+#
+# Clocks
+#
+net "FPGA_CLK"     loc="P43"  | IOSTANDARD = LVCMOS33 ; # 12MHz
+#
+# Manually assign locations for the DCMs along the bottom of the FPGA
+# because PAR sometimes places them in opposing corners and that ruins the clocks.
+#
+#INST "u1/gen_dlls.dllint" LOC="DCM_X0Y0";
+#INST "u1/gen_dlls.dllext" LOC="DCM_X1Y0";
+
+# Manually assign locations for the DCMs along the bottom of the FPGA
+# because PAR sometimes places them in opposing corners and that ruins the clocks.
+#INST "u2_dllint" LOC="DCM_X0Y0";
+#INST "u2_dllext" LOC="DCM_X1Y0";
+#
+# SDRAM memory pin assignments
+#
+net "SDRAM_CLKFB"  loc="P40"  | IOSTANDARD = LVCMOS33 ;  # feedback SDRAM clock after PCB delays
+net "SDRAM_CLK"    loc="P41"  | IOSTANDARD = LVCMOS33 ;  # clock to SDRAM
+net "SDRAM_RAS_N"  loc="P59"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_CAS_N"  loc="P60"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_WE_N"   loc="P64"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_A<0>"   loc="P49"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<1>"   loc="P48"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<2>"   loc="P46"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<3>"   loc="P31"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<4>"   loc="P30"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<5>"   loc="P29"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<6>"   loc="P28"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<7>"   loc="P27"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<8>"   loc="P23"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<9>"   loc="P24"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<10>"  loc="P51"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_A<11>"  loc="P25"  | IOSTANDARD = LVCMOS33 ;  
+net "SDRAM_D<0>"   loc="P90"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<1>"   loc="P77"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<2>"   loc="P78"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<3>"   loc="P85"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<4>"   loc="P86"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<5>"   loc="P71"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<6>"   loc="P70"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<7>"   loc="P65"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<8>"   loc="P16"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<9>"   loc="P15"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<10>"  loc="P10"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<11>"  loc="P9"   | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<12>"  loc="P6"   | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<13>"  loc="P5"   | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<14>"  loc="P99"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_D<15>"  loc="P98"  | IOSTANDARD = LVCMOS33 ; 
+net "SDRAM_BS"     loc="P53"  | IOSTANDARD = LVCMOS33 ;  
+#
+# XuLA I/O pins connected to B5 Peripheral Connect Interface
+# Note that the Spartan3A does not have input protection diodes
+# except for PCI33 & PCI66 IOSTANDARD which are only applicable to I/O pins 
+# Refer to Xilix UG332 Chapter 10 and XAPP459
+# http://forums.xilinx.com/t5/Spartan-Family-FPGAs/Spartan-3A-5V-fix/td-p/117818
+# The B5 periperal Connect board needs to run off 5V
+# because most PS/2 Keyboards need 5V to operate and will not run off 3.3V
+#
+# RS232 PORT
+#
+NET "RS232_RTS"    LOC="P36"  | IOSTANDARD = PCI33_3  ; # IO CHAN0 RS232 RTS      B5 peripheral 19
+NET "RS232_TXD"    LOC="P37"  | IOSTANDARD = PCI33_3  ; # IO CHAN1 RS232 TD       B5 peripheral 18
+NET "RS232_RXD"    LOC="P50"  | IOSTANDARD = PCI33_3  ; # IO CHAN3 RS232 RD       B5 peripheral 17
+NET "RS232_CTS"    LOC="P52"  | IOSTANDARD = PCI33_3  ; # IO CHAN4 RS232 CTS      B5 peripheral 16
+#
+# PS/2 Mouse
+#
+#NET "MOUSE_DAT"    LOC="P56"  | IOSTANDARD = PCI33_3 ; # IO CHAN5 MOUSE DATA     B5 Peripheral 14
+#NET "MOUSE_CLK"    LOC="P57"  | IOSTANDARD = PCI33_3 ; # IO CHAN6 MOUSE DATA     B5 Peripheral 13
+#
+# PS/2 Keyboard
+#
+NET "KEYB_DAT"     LOC="P56"  | IOSTANDARD = PCI33_3 ; # IO CHAN5 KEYBOARD DATA     B5 Peripheral 12
+NET "KEYB_CLK"     LOC="P57"  | IOSTANDARD = PCI33_3 ; # IO CHAN6 KEYBOARD DATA     B5 Peripheral 11
+#
+# VGA Outputs
+#
+NET "VGA_RED"      LOC="P61"  | IOSTANDARD = PCI33_3 ; # IO CHAN7  VGA RED   HIGH/LOW B5 Peripheral 10,9
+NET "VGA_GREEN"    LOC="P62"  | IOSTANDARD = PCI33_3 ; # IO CHAN8  VGA GREEN HIGH/LOW B5 Peripheral 8,7 
+NET "VGA_BLUE"     LOC="P72"  | IOSTANDARD = PCI33_3 ; # IO CHAN10 VGA BLUR  HIGH/LOW B5 Peripheral 6,5       
+NET "VGA_HSYNC_N"  LOC="P73"  | IOSTANDARD = PCI33_3 ; # IO CHAN11 VGA HDRIVE         B5 Peripheral 4      
+NET "VGA_VSYNC_N"  LOC="P83"  | IOSTANDARD = PCI33_3 ; # IO CHAN13 VGA VDIVE          B5 Peripheral 3
+#
+# PORTA 8 bit Parallel I/O (Possible FDC data port)
+#
+NET "PA<1>"        LOC="P84"  | IOSTANDARD = PCI33_3 ; # IO CHAN14   D0
+NET "PA<0>"        LOC="P35"  | IOSTANDARD = PCI33_3 ; # IO CHAN15   D1
+NET "PA<2>"        LOC="P34"  | IOSTANDARD = PCI33_3 ; # IO CHAN16   D2
+NET "PA<3>"        LOC="P33"  | IOSTANDARD = PCI33_3 ; # IO CHAN17   D3
+NET "PA<4>"        LOC="P32"  | IOSTANDARD = PCI33_3 ; # IO CHAN18   D4       
+NET "PA<5>"        LOC="P20"  | IOSTANDARD = PCI33_3 ; # IO CHAN20   D5
+NET "PA<6>"        LOC="P19"  | IOSTANDARD = PCI33_3 ; # IO CHAN21   D6
+NET "PA<7>"        LOC="P13"  | IOSTANDARD = PCI33_3 ; # IO CHAN22   D7
+#
+# PORTB 5 Bit Parallel I/O (Possible FDC control port)
+#
+NET "PB<0>"        LOC="P12"  | IOSTANDARD = PCI33_3 ; # IO CHAN23   A0
+NET "PB<1>"        LOC="P4"   | IOSTANDARD = PCI33_3 ; # IO CHAN25   A1
+NET "PB<2>"        LOC="P3"   | IOSTANDARD = PCI33_3 ; # IO CHAN26   A3
+NET "PB<3>"        LOC="P94"  | IOSTANDARD = PCI33_3 ; # IO CHAN28   RD_N
+NET "PB<4>"        LOC="P93"  | IOSTANDARD = PCI33_3 ; # IO CHAN29   WR_N
+#
+# PORTC 3 Bit Input Port (actually top 3 bits of PortB)
+# Note input only pins (PC<5>) do not support the PCI33 diode clamps
+#
+NET "PC<5>"        LOC="P97"  | IOSTANDARD = LVCMOS33 ; # I  CHAN27 *** Not PCI33
+NET "PC<6>"        LOC="P89"  | IOSTANDARD = PCI33_3  ; # IO CHAN30   DRQ
+NET "PC<7>"        LOC="P88"  | IOSTANDARD = PCI33_3  ; # IO CHAN31   INT
+#
+# Push button switch
+# Note input only pins do not support the PCI33 diode clamps
+#
+NET "SW2_N"        LOC="P39"  | IOSTANDARD = LVCMOS33 ; # I CHAN2 Pushbutton Active Low 
+NET "SW3_N"        LOC="P68"  | IOSTANDARD = LVCMOS33 ; # I CHAN9 Pushbutton Active Low 
+#NET "PC<5>"        LOC="P82"  | IOSTANDARD = LVCMOS33 ; # I CHAN12
+#NET "PC<6>"        LOC="P21"  | IOSTANDARD = LVCMOS33 ; # I CHAN19
+#NET "PC<7>"        LOC="P7"   | IOSTANDARD = LVCMOS33 ; # I CHAN24
+#
+# XuLA I/O pins
+#
+#NET "CHAN_CLK" LOC="P44"  | IOSTANDARD = LVCMOS33 ; # CHAN_CLK I
+#NET "CHAN<0>"  LOC="P36"  | IOSTANDARD = PCI33_3  ; # CHAN0    I/O
+#NET "CHAN<1>"  LOC="P37"  | IOSTANDARD = PCI33_3  ; # CHAN1    I/O
+#NET "CHAN<2>"  LOC="P39"  | IOSTANDARD = LVCMOS33 ; # CHAN2    I
+#NET "CHAN<3>"  LOC="P50"  | IOSTANDARD = PCI33_3  ; # CHAN3    I/O
+#NET "CHAN<4>"  LOC="P52"  | IOSTANDARD = PCI33_3  ; # CHAN4    I/O
+#NET "CHAN<5>"  LOC="P56"  | IOSTANDARD = PCI33_3  ; # CHAN5    I/O
+#NET "CHAN<6>"  LOC="P57"  | IOSTANDARD = PCI33_3  ; # CHAN6    I/O
+#NET "CHAN<7>"  LOC="P61"  | IOSTANDARD = PCI33_3  ; # CHAN7    I/O
+#NET "CHAN<8>"  LOC="P62"  | IOSTANDARD = PCI33_3  ; # CHAN8    I/O
+#NET "CHAN<9>"  LOC="P68"  | IOSTANDARD = LVCMOS33 ; # CHAN9    I
+#NET "CHAN<10>" LOC="P72"  | IOSTANDARD = PCI33_3  ; # CHAN10   I/O
+#NET "CHAN<11>" LOC="P73"  | IOSTANDARD = PCI33_3  ; # CHAN11   I/O
+#NET "CHAN<12>" LOC="P82"  | IOSTANDARD = LVCMOS33 ; # CHAN12   I
+#NET "CHAN<13>" LOC="P83"  | IOSTANDARD = PCI33_3  ; # CHAN13   I/O
+#NET "CHAN<14>" LOC="P84"  | IOSTANDARD = PCI33_3  ; # CHAN14   I/O
+#NET "CHAN<15>" LOC="P35"  | IOSTANDARD = PCI33_3  ; # CHAN15   I/O
+#NET "CHAN<16>" LOC="P34"  | IOSTANDARD = PCI33_3  ; # CHAN16   I/O
+#NET "CHAN<17>" LOC="P33"  | IOSTANDARD = PCI33_3  ; # CHAN17   I/O
+#NET "CHAN<18>" LOC="P32"  | IOSTANDARD = PCI33_3  ; # CHAN18   I/O
+#NET "CHAN<19>" LOC="P21"  | IOSTANDARD = LVCMOS33 ; # CHAN19   I
+#NET "CHAN<20>" LOC="P20"  | IOSTANDARD = PCI33_3  ; # CHAN20   I/O
+#NET "CHAN<21>" LOC="P19"  | IOSTANDARD = PCI33_3  ; # CHAN21   I/O
+#NET "CHAN<22>" LOC="P13"  | IOSTANDARD = PCI33_3  ; # CHAN22   I/O
+#NET "CHAN<23>" LOC="P12"  | IOSTANDARD = PCI33_3  ; # CHAN23   I/O
+#NET "CHAN<24>" LOC="P7"   | IOSTANDARD = LVCMOS33 ; # CHAN24   I
+#NET "CHAN<25>" LOC="P4"   | IOSTANDARD = PCI33_3  ; # CHAN25   I/O
+#NET "CHAN<26>" LOC="P3"   | IOSTANDARD = PCI33_3  ; # CHAN26   I/O
+#NET "CHAN<27>" LOC="P97"  | IOSTANDARD = LVCMOS33 ; # CHAN27   I
+#NET "CHAN<28>" LOC="P94"  | IOSTANDARD = PCI33_3  ; # CHAN28   I/O
+#NET "CHAN<29>" LOC="P93"  | IOSTANDARD = PCI33_3  ; # CHAN29   I/O
+#NET "CHAN<30>" LOC="P89"  | IOSTANDARD = PCI33_3  ; # CHAN30   I/O
+#NET "CHAN<31>" LOC="P88"  | IOSTANDARD = PCI33_3  ; # CHAN31   I/O
+#NET "TCK"      LOC="P76"  | IOSTANDARD = PCI33_3  ; # TCK      I/O
+#NET "TDI"      LOC="P2"   | IOSTANDARD = PCI33_3  ; # TDI      I/O
+#NET "TDO"      LOC="P75"  | IOSTANDARD = PCI33_3  ; # TDO      I/O
+#NET "TMS"      LOC="P1"   | IOSTANDARD = PCI33_3  ; # TMS      I/O
+#
+# Timing Constraints
+#
+NET "FPGA_CLK" TNM_NET = "FPGA_CLK"; 
+TIMESPEC "TS_clk"=PERIOD "FPGA_CLK" 84 ns HIGH 50 %; 

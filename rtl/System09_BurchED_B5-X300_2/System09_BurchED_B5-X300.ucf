@@ -1,0 +1,240 @@
+#### UCF file created by Project Navigator
+#
+NET "reset_n"      LOC = "p57" ;
+NET "sysclk"       LOC = "p77" ;
+#
+# Connector A
+# For modified B3-SRAM
+#
+NET "ram1_addr<0>"  LOC = "P3" ; #J1-2 (I/O - not a global clock input)
+NET "ram1_addr<1>"  LOC = "P4" ; #J1-3
+NET "ram1_addr<2>"  LOC = "P5" ; #J1-4
+NET "ram1_addr<3>"  LOC = "P6" ; #J1-5
+NET "ram1_addr<4>"  LOC = "P7" ; #J1-6
+NET "ram1_addr<5>"  LOC = "P8" ; #J1-7
+NET "ram1_addr<6>"  LOC = "P9" ; #J1-8
+NET "ram1_addr<7>"  LOC = "P10"; #J1-9
+NET "ram1_csn"      LOC = "P11"; #J1-10
+NET "ram1_addr<8>"  LOC = "P15"; #J1-11
+NET "ram1_addr<9>"  LOC = "P16"; #J1-12
+NET "ram1_addr<10>" LOC = "P17"; #J1-13
+NET "ram1_addr<11>" LOC = "P18"; #J1-14
+NET "ram1_addr<12>" LOC = "P20"; #J1-15
+NET "ram1_addr<13>" LOC = "P21"; #J1-16
+NET "ram1_addr<14>" LOC = "P22"; #J1-17
+NET "ram1_addr<15>" LOC = "P23"; #J1-18
+NET "ram1_addr<16>" LOC = "P24"; #J1-19
+#
+# Connector B
+# For modified B3-SRAM
+#
+NET "ram1_data<0>"  LOC = "P27"; #J2-2 (I/O - not a global clock input)
+NET "ram1_data<1>"  LOC = "P29"; #J2-3
+NET "ram1_data<2>"  LOC = "P30"; #J2-4
+NET "ram1_data<3>"  LOC = "P31"; #J2-5
+NET "ram1_data<4>"  LOC = "P33"; #J2-6
+NET "ram1_data<5>"  LOC = "P34"; #J2-7
+NET "ram1_data<6>"  LOC = "P35"; #J2-8
+NET "ram1_data<7>"  LOC = "P36"; #J2-9
+NET "ram1_data<8>"  LOC = "P40"; #J2-10
+NET "ram1_data<9>"  LOC = "P41"; #J2-11
+NET "ram1_data<10>" LOC = "P42"; #J2-12
+NET "ram1_data<11>" LOC = "P43"; #J2-13
+NET "ram1_data<12>" LOC = "P44"; #J2-14
+NET "ram1_data<13>" LOC = "P45"; #J2-15
+NET "ram1_data<14>" LOC = "P46"; #J2-16
+NET "ram1_data<15>" LOC = "P47"; #J2-17
+NET "ram1_wrun"     LOC = "P48"; #J2-18
+NET "ram1_wrln"     LOC = "P49"; #J2-19
+#
+# Connector C
+# For B5-Peripheral-Connectors
+#
+NET "vga0_vs"       LOC = "p55" ; #pin 3
+NET "vga0_hs"       LOC = "p56" ; #pin 4
+NET "vga0_blue<0>"  LOC = "p58" ; #pin 5
+NET "vga0_blue<1>"  LOC = "p59" ; #pin 6
+NET "vga0_green<0>" LOC = "p60" ; #pin 7
+NET "vga0_green<1>" LOC = "p61" ; #pin 8
+NET "vga0_red<0>"   LOC = "p62" ; #pin 9
+NET "vga0_red<1>"   LOC = "p63" ; #pin 10
+NET "kb0_clock"     LOC = "p64" ; #pin 11
+NET "kb0_data"      LOC = "p68" ; #pin 12
+#NET "mouse0_clock" LOC = "p69" ; #pin 13
+#NET "mouse0_data"  LOC = "p70" ; #pin 14
+#NET "buzzer0"      LOC = "p71" ; #pin 15
+NET "uart0_cts_n"   LOC = "p73" ; #pin 16
+NET "uart0_rxd"     LOC = "p74" ; #pin 17
+NET "uart0_txd"     LOC = "p75" ; #pin 18
+NET "uart0_rts_n"   LOC = "p81" ; #pin 19
+#
+# Connector D
+# B3-FPGA-CPU-IO Module
+#
+#NET "aux1_clk"     LOC = "P80" ; #J1-2
+#NET "buzzer1"      LOC = "P82" ; #J1-3
+NET "led"           LOC = "p82" ; #J1-3
+#NET "mouse1_clock" LOC = "P83" ; #J1-4
+#NET "mouse1_data"  LOC = "P84" ; #J1-5
+NET "uart1_cts_n"   LOC = "P86" ; #J1-6
+NET "uart1_rts_n"   LOC = "P87" ; #J1-7
+NET "uart1_txd"     LOC = "P88" ; #J1-8
+NET "uart1_rxd"     LOC = "P89" ; #J1-9
+#NET "kb1_clock"     LOC = "P93" ; #J1-10
+#NET "kb1_data"      LOC = "P94" ; #J1-11
+#NET "vga1_vs"       LOC = "P95" ; #J1-12
+#NET "vga1_hs"       LOC = "P96" ; #J1-13
+#NET "vga1_blue<0>"  LOC = "P97" ; #J1-14
+#NET "vga1_blue<1>"  LOC = "P98" ; #J1-15
+#NET "vga1_green<0>" LOC = "P99" ; #J1-16
+#NET "vga1_green<1>" LOC = "P100"; #J1-17
+#NET "vga1_red<0>"   LOC = "P101"; #J1-18
+#NET "vga1_red<1>"   LOC = "P102"; #J1-19
+#
+# Connector E
+# For B5-SRAM
+#
+NET "ram0_csn"      LOC = "p108"; #J1.2
+NET "ram0_addr<16>" LOC = "p109"; #J1.3
+NET "ram0_addr<15>" LOC = "p110"; #J1.4
+NET "ram0_addr<14>" LOC = "p111"; #J1.5
+NET "ram0_addr<13>" LOC = "p112"; #J1.6
+NET "ram0_addr<12>" LOC = "p113"; #J1.7
+NET "ram0_addr<11>" LOC = "p114"; #J1.8
+NET "ram0_addr<10>" LOC = "p115"; #J1.9
+NET "ram0_addr<9>"  LOC = "p116"; #J1.10
+NET "ram0_addr<8>"  LOC = "p120"; #J1.11
+NET "ram0_addr<7>"  LOC = "p121"; #J1.12
+NET "ram0_addr<6>"  LOC = "p122"; #J1.13
+NET "ram0_addr<5>"  LOC = "p123"; #J1.14
+NET "ram0_addr<4>"  LOC = "p125"; #J1.15
+NET "ram0_addr<3>"  LOC = "p126"; #J1.16
+NET "ram0_addr<2>"  LOC = "p127"; #J1.17
+NET "ram0_addr<1>"  LOC = "p129"; #J1.18
+NET "ram0_addr<0>"  LOC = "p132"; #J1.19
+#
+# Connector F
+# For B5-SRAM
+#
+NET "ram0_wrun"     LOC = "p133"; #J2.2
+NET "ram0_wrln"     LOC = "p134"; #J2.3
+NET "ram0_data<15>" LOC = "p135"; #J2.4
+NET "ram0_data<14>" LOC = "p136"; #J2.5
+NET "ram0_data<13>" LOC = "p138"; #J2.6
+NET "ram0_data<12>" LOC = "p139"; #J2.7
+NET "ram0_data<11>" LOC = "p140"; #J2.8
+NET "ram0_data<10>" LOC = "p141"; #J2.9
+NET "ram0_data<9>"  LOC = "p145"; #J2.10
+NET "ram0_data<8>"  LOC = "p146"; #J2.11
+NET "ram0_data<7>"  LOC = "p147"; #J2.12
+NET "ram0_data<6>"  LOC = "p148"; #J2.13
+NET "ram0_data<5>"  LOC = "p149"; #J2.14
+NET "ram0_data<4>"  LOC = "p150"; #J2.15
+NET "ram0_data<3>"  LOC = "p151"; #J2.16
+NET "ram0_data<2>"  LOC = "p152"; #J2.17
+NET "ram0_data<1>"  LOC = "p153"; #J2.18
+NET "ram0_data<0>"  LOC = "p154"; #J2.19
+#
+# Connector G
+# For B5-Compact-Flash:
+#
+#NET "pin2"        LOC = "P182"  ; #J1-2	 (clk input)
+#NET "pin3"        LOC = "P160"  ; #J1-3
+#NET "cf_intrq"    LOC = "P161"  ; #J1-4
+NET "cf_wr_n"      LOC = "P162"  ; #J1-5
+NET "cf_rd_n"      LOC = "P163"  ; #J1-6
+NET "cf_cs1_n"     LOC = "P164"  ; #J1-7
+NET "cf_d<15>"     LOC = "P165"  ; #J1-8
+NET "cf_d<14>"     LOC = "P166" ; #J1-9
+NET "cf_d<13>"     LOC = "P167" ; #J1-10
+NET "cf_d<12>"     LOC = "P168" ; #J1-11
+NET "cf_d<11>"     LOC = "P169" ; #J1-12
+#NET "cf_present"  LOC = "P173" ; #J1-13
+NET "cf_d<3>"      LOC = "P174" ; #J1-14
+NET "cf_d<4>"      LOC = "P175" ; #J1-15
+NET "cf_d<5>"      LOC = "P176" ; #J1-16
+NET "cf_d<6>"      LOC = "P178" ; #J1-17
+NET "cf_d<7>"      LOC = "P179" ; #J1-18
+NET "cf_cs0_n"     LOC = "P180" ; #J1-19
+#
+# Connector H
+# For B5-Compact-Flash:
+#
+#NET "pin2"        LOC = "p185"; #J2-2 (clk input)
+#NET "pin3"        LOC = "p181"; #J2-3
+#NET "pin4"        LOC = "p187"; #J2-4
+#NET "pin5"        LOC = "p188"; #J2-5
+NET "cf_a<2>"      LOC = "P189"; #J2-6
+NET "cf_a<1>"      LOC = "P191"; #J2-7
+NET "cf_a<0>"      LOC = "P192"; #J2-8
+NET "cf_d<0>"      LOC = "P193"; #J2-9
+NET "cf_d<1>"      LOC = "P194"; #J2-10
+NET "cf_d<2>"      LOC = "P198"; #J2-11
+#NET "cf_cs16_n"   LOC = "P199"; #J2-12
+NET "cf_d<10>"     LOC = "P200"; #J2-13
+NET "cf_d<9>"      LOC = "P201"; #J2-14
+NET "cf_d<8>"      LOC = "P202"; #J2-15
+#NET "cf_pdiag"    LOC = "P203"; #J2-16
+#NET "cf_dase"     LOC = "P204"; #J2-17
+#NET "cf_iordy"    LOC = "P205"; #J2-18
+NET "cf_rst_n"     LOC = "P206"; #J2-19
+#
+# Timing Groups
+#
+INST "ram0_addr<0>" TNM = "gram0_addr";
+INST "ram0_addr<1>" TNM = "gram0_addr";
+INST "ram0_addr<2>" TNM = "gram0_addr";
+INST "ram0_addr<3>" TNM = "gram0_addr";
+INST "ram0_addr<4>" TNM = "gram0_addr";
+INST "ram0_addr<5>" TNM = "gram0_addr";
+INST "ram0_addr<6>" TNM = "gram0_addr";
+INST "ram0_addr<7>" TNM = "gram0_addr";
+INST "ram0_addr<8>" TNM = "gram0_addr";
+INST "ram0_addr<9>" TNM = "gram0_addr";
+INST "ram0_addr<10>" TNM = "gram0_addr";
+INST "ram0_addr<11>" TNM = "gram0_addr";
+INST "ram0_addr<12>" TNM = "gram0_addr";
+INST "ram0_addr<13>" TNM = "gram0_addr";
+INST "ram0_addr<14>" TNM = "gram0_addr";
+INST "ram0_addr<15>" TNM = "gram0_addr";
+INST "ram0_addr<16>" TNM = "gram0_addr";
+INST "ram0_data<0>" TNM = "gram0_data";
+INST "ram0_data<1>" TNM = "gram0_data";
+INST "ram0_data<2>" TNM = "gram0_data";
+INST "ram0_data<3>" TNM = "gram0_data";
+INST "ram0_data<4>" TNM = "gram0_data";
+INST "ram0_data<5>" TNM = "gram0_data";
+INST "ram0_data<6>" TNM = "gram0_data";
+INST "ram0_data<7>" TNM = "gram0_data";
+INST "ram0_data<8>" TNM = "gram0_data";
+INST "ram0_data<9>" TNM = "gram0_data";
+INST "ram0_data<10>" TNM = "gram0_data";
+INST "ram0_data<11>" TNM = "gram0_data";
+INST "ram0_data<12>" TNM = "gram0_data";
+INST "ram0_data<13>" TNM = "gram0_data";
+INST "ram0_data<14>" TNM = "gram0_data";
+INST "ram0_data<15>" TNM = "gram0_data";
+INST "ram0_wrln" TNM = "gram0_wr";
+INST "ram0_wrun" TNM = "gram0_wr";
+INST "ram0_csn" TNM = "gram0_cs";
+#
+# Timing Constraints
+#
+#TIMEGRP "gram0_cs"   OFFSET = OUT 40 ns AFTER "sysclk";
+#TIMEGRP "gram0_wr"   OFFSET = OUT 40 ns AFTER "sysclk";
+#TIMEGRP "gram0_addr" OFFSET = OUT 40 ns AFTER "sysclk";
+#TIMEGRP "gram0_data" OFFSET = OUT 40 ns AFTER "sysclk";
+#TIMEGRP "gram0_data" OFFSET = IN 15 ns BEFORE "sysclk";
+#TIMEGRP "gtest_alu" OFFSET = OUT 90 ns AFTER "sysclk";
+#TIMEGRP "gtest_cc"  OFFSET = OUT 95 ns AFTER "sysclk";
+NET "sysclk" TNM_NET = "sysclk";
+TIMESPEC "TS_sysclk" = PERIOD "sysclk" 20 ns LOW 50 %;
+#
+# Fast I/O Pins
+#
+NET "ram0_csn" FAST;
+NET "ram0_wrln" FAST;
+NET "ram0_wrun" FAST;
+NET "ram1_csn" FAST;
+NET "ram1_wrln" FAST;
+NET "ram1_wrun" FAST;

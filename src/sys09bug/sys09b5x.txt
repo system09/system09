@@ -1,0 +1,5 @@
+ NAM SYS09BUG FOR THE B5-X300
+ INCLUDE "opt_b5x.txt"
+ INCLUDE "sys09equ.txt"
+ INCLUDE "sys09bug.txt"
+ END 

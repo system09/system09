@@ -1,0 +1,635 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         *
+0002                         * Sector Dump Utility
+0003                         * For Compact Flash Driver 
+0004                         * for the 6809
+0005                         * Configured in 8 bit mode
+0006                         *
+0007                         * John Kent
+0008                         * 21 May 2007
+0009                         *
+0010                         * Register Equates
+0011                         *
+0012 E040                    CF_BASE    EQU $E040
+0013 E040                    CF_DATA    EQU CF_BASE+0
+0014 E041                    CF_ERROR   EQU CF_BASE+1 ; read error
+0015 E041                    CF_FEATURE EQU CF_BASE+1 ; write feature
+0016 E042                    CF_SECCNT  EQU CF_BASE+2
+0017 E043                    CF_SECNUM  EQU CF_BASE+3
+0018 E044                    CF_CYLLO   EQU CF_BASE+4
+0019 E045                    CF_CYLHI   EQU CF_BASE+5
+0020 E046                    CF_HEAD    EQU CF_BASE+6
+0021 E047                    CF_STATUS  EQU CF_BASE+7 ; read status
+0022 E047                    CF_COMAND  EQU CF_BASE+7 ; write command
+0023                         *
+0024                         * Command Equates
+0025                         *
+0026 0020                    CMDREAD    EQU $20 ; Read Single sector
+0027 0030                    CMDWRITE   EQU $30 ; Write Single sector
+0028 00EF                    CMDFEATURE EQU $EF
+0029 0001                    FEAT8BIT   EQU $01 ; enable 8 bit transfers
+0030 00E0                    HEADLBA    EQU $E0
+0031                         *
+0032                         * Status bit equates
+0033                         *
+0034 0080                    BUSY       EQU $80
+0035 0040                    DRDY       EQU $40
+0036 0008                    DRQ        EQU $08
+0037 0001                    ERR        EQU $01
+0038                         *
+0039                         * Start of Program
+0040                         *
+0041 0100                             ORG $0100
+0042 0100 16 02 46           START    LBRA START1
+0043                         *
+0044                         * DATA STORAGE
+0045                         *
+0046 0103 00 00 00           SECNUM   FCB $00,$00,$00
+0047 0106 E0 00              CPORT    FDB $E000
+0048 0108 FF                 ECHO     FCB $FF
+0049                         *
+0050                         * SECTOR BUFFER
+0051                         *
+0052 0109                    SECBUF   RMB 512
+0053                         *
+0054                         * PROGRAM STACK
+0055                         *
+0056 0309                             RMB 64
+0057 0349                    STACK	 EQU *
+0058                         *
+0059                         * Initialization
+0060                         *
+0061 0349 10 CE 03 49        START1 LDS #STACK
+0062                         *
+0063                         * Clear sector buffer
+0064                         *
+0065 034D 8E 01 09                  LDX #SECBUF
+0066 0350 10 8E 02 00               LDY #512
+0067 0354 6F 80              ZEROLP CLR ,X+
+0068 0356 31 3F                     LEAY -1,Y
+0069 0358 26 FA                     BNE ZEROLP
+0070                         *
+0071                         * INITIALIZE CF CARD FOR 8 BIT LBA MODE
+0072                         *
+0073 035A BD 04 64                  JSR WAITRDY
+0074 035D 86 E0                     LDA #HEADLBA
+0075 035F B7 E0 46                  STA CF_HEAD
+0076 0362 BD 04 64                  JSR WAITRDY
+0077 0365 86 01                     LDA #FEAT8BIT
+0078 0367 B7 E0 41                  STA CF_FEATURE
+0079 036A 86 EF                     LDA #CMDFEATURE
+0080 036C B7 E0 47                  STA CF_COMAND
+0081 036F BD 04 64                  JSR WAITRDY
+0082                         *
+0083                         * DISPLAY TITTLE BANNER
+0084                         *
+0085 0372 8E 06 4E                  LDX #TTLMSG
+0086 0375 BD 05 FB                  JSR PDATA
+0087                         *
+0088                         * COMMAND LOOP
+0089                         * R - READ
+0090                         * W - WRITE
+0091                         * N - NEXT
+0092                         * P - PREV
+0093                         * M - MODIFY
+0094                         * Q - QUIT
+0095                         *
+0096 0378 8E 06 78           CMDLP  LDX #CMDMSG
+0097 037B BD 05 FB                  JSR PDATA
+0098 037E BD 06 02                  JSR ECHON
+0099 0381 81 52                     CMPA #'R'
+0100 0383 27 4A                     BEQ READ
+0101 0385 81 4E                     CMPA #'N'
+0102 0387 27 23                     BEQ NEXT
+0103 0389 81 50                     CMPA #'P'
+0104 038B 27 2E                     BEQ PREV
+0105 038D 81 57                     CMPA #'W'
+0106 038F 10 27 00 88               LBEQ WRITE
+0107 0393 81 4D                     CMPA #'M'
+0108 0395 27 10                     BEQ MODIFY
+0109 0397 81 51                     CMPA #'Q'
+0110 0399 27 08                     BEQ QUIT
+0111 039B 8E 07 31                  LDX #WOTMSG
+0112 039E BD 05 EC                  JSR PSTRNG
+0113 03A1 20 D5                     BRA CMDLP
+0114                         *
+0115                         * QUIT
+0116                         *
+0117 03A3 6E 9F F8 00        QUIT   JMP [$F800]
+0118                         *
+0119                         * MODIFY SECTOR
+0120                         *
+0121 03A7 BD 04 F3           MODIFY JSR MEMCHG
+0122 03AA 20 CC                     BRA CMDLP
+0123                         *
+0124                         * NEXT SECTOR (READ)
+0125                         * INCREMENT SECTOR NUMBER
+0126                         * WRAPS AROUND TO ZERO ON $FFFFFF
+0127                         *
+0128 03AC BE 01 04           NEXT   LDX SECNUM+1
+0129 03AF 30 01                     LEAX 1,X
+0130 03B1 BF 01 04                  STX SECNUM+1
+0131 03B4 26 2A                     BNE READS 
+0132 03B6 7C 01 03                  INC SECNUM
+0133 03B9 20 25                     BRA READS
+0134                         *
+0135                         * PREVIOUS SECTOR (READ)
+0136                         * DECREMENT SECTOR NUMBER
+0137                         * DON'T DECREMENT PAST $000000
+0138                         *
+0139 03BB BE 01 04           PREV   LDX SECNUM+1
+0140 03BE 26 08                     BNE PREV1
+0141 03C0 7D 01 03                  TST SECNUM
+0142 03C3 27 1B                     BEQ READS
+0143 03C5 7A 01 03                  DEC SECNUM
+0144 03C8 30 1F              PREV1  LEAX -1,X
+0145 03CA BF 01 04                  STX SECNUM+1
+0146 03CD 20 11                     BRA READS
+0147                         *
+0148                         * READ SECTORS FROM CF
+0149                         *
+0150 03CF 8E 06 DF           READ   LDX #SECPMT
+0151 03D2 BD 05 EC                  JSR PSTRNG
+0152 03D5 BD 05 59                  JSR IN6HEX
+0153 03D8 29 3E                     BVS RDEXIT
+0154 03DA F7 01 03                  STB SECNUM
+0155 03DD BF 01 04                  STX SECNUM+1
+0156                         *
+0157 03E0 86 01              READS  LDA #$01
+0158 03E2 B7 E0 42                  STA CF_SECCNT
+0159 03E5 B6 01 05                  LDA SECNUM+2
+0160 03E8 B7 E0 43                  STA CF_SECNUM
+0161 03EB B6 01 04                  LDA SECNUM+1
+0162 03EE B7 E0 44                  STA CF_CYLLO
+0163 03F1 B6 01 03                  LDA SECNUM+0
+0164 03F4 B7 E0 45                  STA CF_CYLHI
+0165                         *
+0166 03F7 86 20                     LDA #CMDREAD ; IDE READ MULTIPLE
+0167 03F9 B7 E0 47                  STA CF_COMAND
+0168 03FC BD 04 64                  JSR WAITRDY
+0169                         *
+0170 03FF 8E 01 09                  LDX #SECBUF
+0171 0402 10 8E 02 00               LDY #512
+0172                         *
+0173                         * READ LOOP
+0174                         *
+0175 0406 BD 04 73           RDLOOP JSR WAITDRQ
+0176 0409 B6 E0 40                  LDA CF_DATA
+0177 040C A7 80                     STA ,X+
+0178 040E 31 3F                     LEAY -1,Y
+0179 0410 26 F4                     BNE RDLOOP
+0180                         *
+0181 0412 BD 04 64                  JSR WAITRDY
+0182 0415 BD 04 7B                  JSR MEMDUMP
+0183 0418 7E 03 78           RDEXIT JMP CMDLP
+0184                         *
+0185                         * WRITE SECTOR TO CF
+0186                         *
+0187 041B 8E 06 DF           WRITE  LDX #SECPMT
+0188 041E BD 05 EC                  JSR PSTRNG
+0189 0421 BD 05 59                  JSR IN6HEX
+0190 0424 29 3B                     BVS WREXIT
+0191 0426 F7 01 03                  STB SECNUM
+0192 0429 BF 01 04                  STX SECNUM+1
+0193                         *
+0194 042C 86 01                     LDA #$01
+0195 042E B7 E0 42                  STA CF_SECCNT
+0196 0431 B6 01 05                  LDA SECNUM+2
+0197 0434 B7 E0 43                  STA CF_SECNUM
+0198 0437 B6 01 04                  LDA SECNUM+1
+0199 043A B7 E0 44                  STA CF_CYLLO
+0200 043D B6 01 03                  LDA SECNUM+0
+0201 0440 B7 E0 45                  STA CF_CYLHI
+0202                         *
+0203 0443 86 30                     LDA #CMDWRITE; IDE WRITE MULTIPLE
+0204 0445 B7 E0 47                  STA CF_COMAND
+0205 0448 BD 04 64                  JSR WAITRDY
+0206                         *
+0207 044B 8E 01 09                  LDX #SECBUF
+0208 044E 10 8E 02 00               LDY #512
+0209                         *
+0210                         * WRITE LOOP
+0211                         *
+0212 0452 BD 04 73           WRLOOP JSR WAITDRQ
+0213 0455 A6 80                     LDA ,X+
+0214 0457 B7 E0 40                  STA CF_DATA
+0215 045A 31 3F                     LEAY -1,Y
+0216 045C 26 F4                     BNE WRLOOP
+0217                         *
+0218 045E BD 04 64                  JSR WAITRDY
+0219 0461 7E 03 78           WREXIT JMP CMDLP
+0220                         *
+0221                         * WAIT UNTIL READY
+0222                         *
+0223 0464 B6 E0 47           WAITRDY LDA CF_STATUS
+0224 0467 85 80                      BITA #BUSY
+0225 0469 26 F9                      BNE WAITRDY
+0226 046B B6 E0 47                   LDA CF_STATUS
+0227 046E 85 40                      BITA #DRDY
+0228 0470 27 F2                      BEQ WAITRDY
+0229 0472 39                         RTS
+0230                         *
+0231                         * WAIT FOR DATA REQUEST
+0232                         *
+0233 0473 B6 E0 47           WAITDRQ LDA CF_STATUS
+0234 0476 85 08                      BITA #DRQ
+0235 0478 27 F9                      BEQ WAITDRQ
+0236 047A 39                         RTS
+0237                         *
+0238                         * DUMP SECTOR IN MEMORY
+0239                         * 
+0240 047B 8E 06 F8           MEMDUMP LDX  #SECMSG
+0241 047E BD 05 EC                   JSR  PSTRNG
+0242 0481 B6 01 03                   LDA  SECNUM
+0243 0484 BD 05 C1                   JSR  OUT2H
+0244 0487 BE 01 04                   LDX  SECNUM+1
+0245 048A BD 05 B9                   JSR  OUT4H
+0246 048D BD 05 F0                   JSR  PCRLF
+0247 0490 10 8E 00 00                LDY  #$0000
+0248 0494 30 A9 01 FF                LEAX #$1FF,Y
+0249                         * 
+0250                         * ADJUST LOWER AND UPPER ADDRESS LIMITS 
+0251                         * TO EVEN 16 BYTE BOUNDRIES. 
+0252                         * 
+0253                         * IF LOWER ADDR = $4532 
+0254                         * LOWER BOUNDS WILL BE ADJUSTED TO = $4530. 
+0255                         * 
+0256                         * IF UPPER ADDR = $4567 
+0257                         * UPPER BOUNDS WILL BE ADJUSTED TO = $4570. 
+0258                         * 
+0259                         * ENTER WITH LOWER ADDRESS IN X-REG. 
+0260                         *           -UPPER ADDRESS ON TOP OF STACK. 
+0261                         * 
+0262 0498 1F 10              AJDUMP  TFR  X,D     GET UPPER ADDR IN D-REG 
+0263 049A C3 00 10                   ADDD #$10    ADD 16 TO UPPER ADDRESS 
+0264 049D C4 F0                      ANDB #$F0    MASK TO EVEN 16 BYTE BOUNDRY 
+0265 049F 34 06                      PSHS A,B     SAVE ON STACK AS UPPER DUMP LIMIT 
+0266 04A1 1F 20                      TFR  Y,D     $F9A5 GET LOWER ADDRESS IN D-REG 
+0267 04A3 C4 F0                      ANDB #$F0    MASK TO EVEN 16 BYTE BOUNDRY 
+0268 04A5 1F 01                      TFR  D,X     PUT IN X-REG AS LOWER DUMP LIMIT 
+0269 04A7 AC E4              NXTLIN  CMPX ,S      COMPARE LOWER TO UPPER LIMIT 
+0270 04A9 27 05                      BEQ  SKPDMP  IF EQUAL SKIP HEX-ASCII DUMP 
+0271 04AB 17 01 6E                   LBSR INCHEK  CHECK FOR INPUT FROM KEYBOARD 
+0272 04AE 27 03                      BEQ  EDUMP
+0273 04B0 32 62              SKPDMP  LEAS 2,S     READJUST STACK IF NOT DUMPING 
+0274 04B2 39                         RTS          ;
+0275                         * 
+0276                         * PRINT 16 HEX BYTES FOLLOWED BY 16 ASCII CHARACTERS 
+0277                         * FOR EACH LINE THROUGHOUT ADDRESS LIMITS. 
+0278                         * 
+0279 04B3 34 10              EDUMP   PSHS X       PUSH LOWER ADDR LIMIT ON STACK 
+0280 04B5 8E 07 25                   LDX  #MSG5   POINT TO MSG " - " 
+0281 04B8 17 01 31                   LBSR PSTRNG  PRINT MSG 
+0282 04BB AE E4                      LDX  ,S      LOAD LOWER ADDR FROM TOP OF STACK 
+0283 04BD 17 00 F9                   LBSR OUT4H   PRINT THE ADDRESS
+0284 04C0 17 01 63                   LBSR OUT2S   2 SPACES 
+0285 04C3 C6 10                      LDB  #$10    LOAD COUNT OF 16 BYTES TO DUMP 
+0286 04C5 A6 89 01 09        ELOOP   LDA  SECBUF,X     GET FROM MEMORY HEX BYTE TO PRINT 
+0287 04C9 30 01                      LEAX 1,X
+0288 04CB 17 00 F3                   LBSR OUT2H   OUTPUT HEX BYTE AS ASCII 
+0289 04CE 17 01 57                   LBSR OUT1S   OUTPUT SPACE 
+0290 04D1 5A                         DECB         $F9D1 DECREMENT BYTE COUNT 
+0291 04D2 26 F1                      BNE  ELOOP   CONTINUE TIL 16 HEX BYTES PRINTED 
+0292                         * 
+0293                         * PRINT 16 ASCII CHARACTERS 
+0294                         * IF NOT PRINTABLE OR NOT VALID 
+0295                         * ASCII PRINT A PERIOD (.) 
+0296 04D4 17 01 4F                   LBSR OUT2S   2 SPACES 
+0297 04D7 AE E1                      LDX  ,S++    GET LOW LIMIT FRM STACK - ADJ STACK 
+0298 04D9 C6 10                      LDB  #$10    SET ASCII CHAR TO PRINT = 16 
+0299 04DB A6 89 01 09        EDPASC  LDA  SECBUF,X     GET CHARACTER FROM MEMORY 
+0300 04DF 30 01                      LEAX 1,X
+0301 04E1 81 20                      CMPA #$20    IF LESS THAN $20, NON-PRINTABLE? 
+0302 04E3 25 04                      BCS  PERIOD  IF SO, PRINT PERIOD INSTEAD 
+0303 04E5 81 7E                      CMPA #$7E    IS IT VALID ASCII? 
+0304 04E7 23 02                      BLS  PRASC   IF SO PRINT IT 
+0305 04E9 86 2E              PERIOD  LDA  #'.     LOAD A PERIOD (.) 
+0306 04EB 17 01 3C           PRASC   LBSR OUTCH   PRINT ASCII CHARACTER 
+0307 04EE 5A                         DECB         DECREMENT COUNT 
+0308 04EF 26 EA                      BNE  EDPASC 
+0309 04F1 20 B4                      BRA  NXTLIN 
+0310                         *
+0311                         * 
+0312                         ***** "M" MEMORY EXAMINE AND CHANGE ***** 
+0313                         *
+0314                         * RESTRICT ADDRESSING RANGE TO 512 BYTES ($000 - $1FF)
+0315                         * 
+0316 04F3 8E 07 0A           MEMCHG  LDX  #MEMMSG
+0317 04F6 BD 05 EC                   JSR  PSTRNG
+0318 04F9 17 00 74                   LBSR IN3HEX  INPUT ADDRESS 
+0319 04FC 29 34                      BVS  CHRTN   IF NOT HEX, RETURN 
+0320 04FE 8C 02 00                   CMPX #$0200
+0321 0501 24 2F                      BHS  CHRTN
+0322 0503 1F 12                      TFR  X,Y     SAVE ADDR IN "Y" 
+0323 0505 8E 07 25           MEMC2   LDX  #MSG5   POINT TO MSG " - " 
+0324 0508 17 00 E1                   LBSR PSTRNG  PRINT MSG 
+0325 050B 1F 21                      TFR  Y,X     FETCH ADDRESS 
+0326 050D 17 00 A9                   LBSR OUT4H   PRINT ADDR IN HEX 
+0327 0510 17 01 15                   LBSR OUT1S   OUTPUT SPACE 
+0328 0513 A6 A9 01 09                LDA  SECBUF,Y GET CONTENTS OF CURRENT ADDR. 
+0329 0517 17 00 A7                   LBSR OUT2H   OUTPUT CONTENTS IN ASCII 
+0330 051A 17 01 0B                   LBSR OUT1S   OUTPUT SPACE 
+0331 051D 17 00 60                   LBSR BYTE    LOOP WAITING FOR OPERATOR INPUT 
+0332 0520 28 11                      BVC  CHANGE  IF VALID HEX GO CHANGE MEM. LOC. 
+0333 0522 81 08                      CMPA #8      IS IT A BACKSPACE (CNTRL H)? 
+0334 0524 27 DF                      BEQ  MEMC2   PROMPT OPERATOR AGAIN 
+0335 0526 81 18                      CMPA #$18    IS IT A CANCEL (CNTRL X)? 
+0336 0528 27 DB                      BEQ  MEMC2   PROMPT OPERATOR AGAIN 
+0337 052A 81 5E                      CMPA #'^     IS IT AN UP ARROW? 
+0338 052C 27 21                      BEQ  BACK    DISPLAY PREVIOUS BYTE 
+0339 052E 81 0D                      CMPA #$D     IS IT A CR? 
+0340 0530 26 13                      BNE  FORWRD  DISPLAY NEXT BYTE 
+0341 0532 39                 CHRTN   RTS          EXIT ROUTINE 
+0342                         * 
+0343                         * 
+0344 0533 A7 A9 01 09        CHANGE  STA  SECBUF,Y      CHANGE BYTE IN MEMORY 
+0345 0537 A1 A9 01 09                CMPA SECBUF,Y      DID MEMORY BYTE CHANGE? 
+0346 053B 27 08                      BEQ  FORWRD  $F972 
+0347 053D 17 00 E8                   LBSR OUT1S   OUTPUT SPACE 
+0348 0540 86 3F                      LDA  #'?     LOAD QUESTION MARK 
+0349 0542 17 00 E5                   LBSR OUTCH   PRINT IT 
+0350 0545 10 8C 01 FF        FORWRD  CMPY #$01FF
+0351 0549 27 BA                      BEQ  MEMC2
+0352 054B 31 21                      LEAY 1,Y     POINT TO NEXT HIGHER MEM LOCATION 
+0353 054D 20 B6                      BRA  MEMC2   PRINT LOCATION & CONTENTS 
+0354 054F 10 8C 00 00        BACK    CMPY #$0000
+0355 0553 27 B0                      BEQ  MEMC2
+0356 0555 31 3F                      LEAY -1,Y    POINT TO LAST MEM LOCATION 
+0357 0557 20 AC                      BRA  MEMC2   PRINT LOCATION & CONTENTS 
+0358                         * 
+0359                         * THE FOLLOWING ROUTINE LOOPS WAITING FOR THE 
+0360                         * OPERATOR TO INPUT ONE VALID HEX ADDRESS. THE 
+0361                         * ADDRESS IS RETURNED IN THE "X" REGISTER. 
+0362                         * 
+0363                         * IN6HEX - MS BYTE IN ACCB
+0364                         *          LS WORD IN X REG
+0365                         *
+0366 0559 32 7D              IN6HEX LEAS -3,S
+0367 055B 8D 23                     BSR  BYTE
+0368 055D 29 57                     BVS  NOTHEX
+0369 055F A7 E4                     STA  0,S
+0370 0561 8D 1D                     BSR  BYTE
+0371 0563 29 51                     BVS  NOTHEX
+0372 0565 A7 61                     STA  1,S
+0373 0567 8D 17                     BSR  BYTE
+0374 0569 29 4B                     BVS  NOTHEX
+0375 056B A7 62                     STA  2,S
+0376 056D 4F                        CLRA
+0377 056E 35 94                     PULS B,X,PC
+0378                         *
+0379                         * INPUT 3 HEX DIGITS
+0380                         * RESULT RETURNED IN X
+0381                         *
+0382 0570 8D 21              IN3HEX BSR INHEX INPUT HEX (1 HEX CHAR) 
+0383 0572 29 42                     BVS NOTHEX EXIT IF NOT VALID HEX 
+0384 0574 1F 01                     TFR  D,X 
+0385 0576 8D 08                     BSR BYTE INPUT BYTE (2 HEX CHAR) 
+0386 0578 29 3C                     BVS NOTHEX 
+0387 057A 34 10                     PSHS X 
+0388 057C A7 61                     STA  1,S 
+0389 057E 35 90                     PULS X,PC 
+0390                         * 
+0391                         ***** INPUT BYTE (2 HEX CHAR.) ***** 
+0392                         * 
+0393 0580 8D 11              BYTE   BSR INHEX GET HEX LEFT 
+0394 0582 29 32                     BVS NOTHEX EXIT IF NOT VALID HEX 
+0395 0584 48                        ASLA   ;
+0396 0585 48                        ASLA   ;
+0397 0586 48                        ASLA   ; SHIFT INTO LEFT NIBBLE
+0398 0587 48                        ASLA   ;
+0399 0588 1F 89                     TFR  A,B PUT HEXL IN "B" 
+0400 058A 8D 07                     BSR INHEX GET HEX RIGHT 
+0401 058C 29 28                     BVS NOTHEX EXIT IF NOT VALID HEX 
+0402 058E 34 04                     PSHS B PUSH HEXL ON STACK 
+0403 0590 AB E0                     ADDA ,S+ ADD HEXL TO HEXR AND ADJ. STK 
+0404 0592 39                        RTS  RETURN WITH HEX L&R IN "A" 
+0405                         * 
+0406                         * 
+0407 0593 8D 6D              INHEX  BSR ECHON INPUT ASCII CHAR. 
+0408 0595 81 30                     CMPA #'0 IS IT > OR = "0" ? 
+0409 0597 25 1D                     BCS NOTHEX IF LESS IT AIN'T HEX 
+0410 0599 81 39                     CMPA #'9 IS IT < OR = "9" ? 
+0411 059B 22 03                     BHI INHEXA IF > MAYBE IT'S ALPHA 
+0412 059D 80 30                     SUBA #$30 ASCII ADJ. NUMERIC 
+0413 059F 39                        RTS  ;
+0414                         * 
+0415                         * 
+0416 05A0 81 41              INHEXA CMPA #'A IS IT > OR = "A" 
+0417 05A2 25 12                     BCS NOTHEX IF LESS IT AIN'T HEX 
+0418 05A4 81 46                     CMPA #'F IS IT < OR = "F" ? 
+0419 05A6 22 03                     BHI INHEXL IF > IT AIN'T HEX 
+0420 05A8 80 37                     SUBA #$37 ASCII ADJ. ALPHA 
+0421 05AA 39                        RTS  ;
+0422                         * 
+0423 05AB 81 61              INHEXL CMPA #'a IS IT > OR = "a" 
+0424 05AD 25 07                     BCS NOTHEX IF LESS IT AIN'T HEX 
+0425 05AF 81 66                     CMPA #'f IS IT < "f" 
+0426 05B1 22 03                     BHI NOTHEX IF > IT AIN'T HEX 
+0427 05B3 80 57                     SUBA #$57 ADJUST TO LOWER CASE 
+0428 05B5 39                        RTS  ;
+0429                         * 
+0430                         * 
+0431 05B6 1A 02              NOTHEX ORCC #2 SET (V) FLAG IN C-CODES REGISTER 
+0432 05B8 39                        RTS  ;
+0433                         * 
+0434                         * 
+0435 05B9 34 10              OUT4H PSHS X PUSH X-REG. ON THE STACK 
+0436 05BB 35 02                     PULS A POP MS BYTE OF X-REG INTO A-ACC. 
+0437 05BD 8D 02                     BSR OUTHL OUTPUT HEX LEFT 
+0438 05BF 35 02                     PULS A POP LS BYTE OF X-REG INTO A-ACC. 
+0439 05C1                    OUTHL EQU * 
+0440 05C1 34 02              OUT2H PSHS A SAVE IT BACK ON STACK 
+0441 05C3 44                        LSRA CONVERT UPPER HEX NIBBLE TO ASCII 
+0442 05C4 44                        LSRA  ;
+0443 05C5 44                        LSRA  ;
+0444 05C6 44                        LSRA  ;
+0445 05C7 8D 04                     BSR XASCII PRINT HEX NIBBLE AS ASCII 
+0446 05C9 35 02              OUTHR PULS A CONVERT LOWER HEX NIBBLE TO ASCII 
+0447 05CB 84 0F                     ANDA #$0F STRIP LEFT NIBBLE 
+0448 05CD 8B 30              XASCII ADDA #$30 ASCII ADJ 
+0449 05CF 81 39                     CMPA #$39 IS IT < OR = "9" ? 
+0450 05D1 2F 02                     BLE  OUTC IF LESS, OUTPUT IT 
+0451 05D3 8B 07                     ADDA #7 IF > MAKE ASCII LETTER 
+0452 05D5 20 53              OUTC BRA  OUTCH OUTPUT CHAR 
+0453                         * 
+0454                         * BINARY / ASCII --- THIS ROUTINE 
+0455                         * OUTPUTS A BYTE IN ENHANCED 
+0456                         * BINARY FORMAT. THE ENHANCEMENT 
+0457                         * IS DONE BY SUBSTITUTING ASCII 
+0458                         * LETTERS FOR THE ONES IN THE BYTE. 
+0459                         * THE ASCII ENHANCEMENT LETTERS 
+0460                         * ARE OBTAINED FROM THE STRING 
+0461                         * POINTED TO BY THE INDEX REG. "X". 
+0462                         * 
+0463 05D7 34 02              BIASCI PSHS A SAVE "A" ON STACK 
+0464 05D9 C6 08                     LDB  #8 PRESET LOOP# TO BITS PER BYTE 
+0465 05DB A6 80              OUTBA LDA ,X+ GET LETTER FROM STRING 
+0466 05DD 68 E4                     ASL  ,S TEST BYTE FOR "1" IN B7 
+0467 05DF 25 02                     BCS PRTBA IF ONE PRINT LETTER 
+0468 05E1 86 2D                     LDA #'- IF ZERO PRINT "-" 
+0469 05E3 8D 45              PRTBA BSR OUTCH PRINT IT 
+0470 05E5 8D 41                     BSR OUT1S PRINT SPACE 
+0471 05E7 5A                        DECB SUB 1 FROM #BITS YET TO PRINT 
+0472 05E8 26 F1                     BNE OUTBA 
+0473 05EA 35 82                     PULS A,PC
+0474                         * 
+0475                         * PRINT STRING PRECEEDED BY A CR & LF. 
+0476                         * 
+0477 05EC 8D 02              PSTRNG BSR PCRLF PRINT CR/LF 
+0478 05EE 20 0B                     BRA  PDATA  PRINT STRING POINTED TO BY IX 
+0479                         * 
+0480                         * PCRLF 
+0481                         * 
+0482 05F0 34 10              PCRLF  PSHS X SAVE IX 
+0483 05F2 8E 07 2A                  LDX  #MSG2+1  POINT TO MSG CR/LF + 3 NULS 
+0484 05F5 8D 04                     BSR PDATA  PRINT MSG 
+0485 05F7 35 90                     PULS X,PC RESTORE IX 
+0486 05F9 8D 2F              PRINT  BSR OUTCH 
+0487                         * 
+0488                         * PDATA 
+0489                         * 
+0490 05FB A6 80              PDATA  LDA  ,X+ GET 1st CHAR. TO PRINT 
+0491 05FD 81 04                     CMPA #4 IS IT EOT? 
+0492 05FF 26 F8                     BNE  PRINT IF NOT EOT PRINT IT 
+0493 0601 39                        RTS  ;
+0494                         * 
+0495                         * 
+0496 0602 7D 01 08           ECHON  TST  ECHO IS ECHO REQUIRED ? 
+0497 0605 27 06                     BEQ  INCH ECHO NOT REQ. IF CLEAR 
+0498                         * 
+0499                         * INCHE 
+0500                         * 
+0501                         * ---GETS CHARACTER FROM TERMINAL AND 
+0502                         * ECHOS SAME. THE CHARACTER IS RETURNED 
+0503                         * IN THE "A" ACCUMULATOR WITH THE PARITY 
+0504                         * BIT MASKED OFF. ALL OTHER REGISTERS 
+0505                         * ARE PRESERVED. 
+0506                         * 
+0507 0607 8D 04              INCHE  BSR INCH GET CHAR FROM TERMINAL 
+0508 0609 84 7F                     ANDA #$7F      STRIP PARITY FROM CHAR. 
+0509 060B 20 1D                     BRA  OUTCH     ECHO CHAR TO TERMINAL 
+0510                         * 
+0511                         * INCH 
+0512                         * 
+0513                         * GET CHARACTER FROM TERMINAL. RETURN 
+0514                         * CHARACTER IN "A" ACCUMULATOR AND PRESERVE 
+0515                         * ALL OTHER REGISTERS. THE INPUT CHARACTER 
+0516                         * IS 8 BITS AND IS NOT ECHOED. 
+0517                         * 
+0518                         * 
+0519 060D 34 10              INCH    PSHS X SAVE IX 
+0520 060F BE 01 06           GETSTA  LDX  CPORT POINT TO TERMINAL PORT 
+0521 0612 A6 84                      LDA  ,X  FETCH PORT STATUS 
+0522 0614 85 01                      BITA #1 TEST READY BIT, RDRF ? 
+0523 0616 27 F7                      BEQ  GETSTA IF NOT RDY, THEN TRY AGAIN 
+0524 0618 A6 01              GETST1  LDA  1,X FETCH CHAR 
+0525 061A 35 90                      PULS X,PC RESTORE IX 
+0526                         * 
+0527                         * INCHEK 
+0528                         * 
+0529                         * CHECK FOR A CHARACTER AVAILABLE FROM 
+0530                         * THE TERMINAL. THE SERIAL PORT IS CHECKED 
+0531                         * FOR READ READY. ALL REGISTERS ARE 
+0532                         * PRESERVED, AND THE "Z" BIT WILL BE 
+0533                         * CLEAR IF A CHARACTER CAN BE READ. 
+0534                         * 
+0535                         * 
+0536 061C 34 02              INCHEK  PSHS A SAVE A ACCUM. 
+0537 061E A6 9F 01 06                LDA  [CPORT] FETCH PORT STATUS 
+0538 0622 85 01                      BITA #1 TEST READY BIT, RDRF ? 
+0539 0624 35 82              INCHEK1 PULS A,PC RESTORE A ACCUM. 
+0540                         * 
+0541 0626 8D 00              OUT2S   BSR OUT1S OUTPUT 2 SPACES 
+0542 0628 86 20              OUT1S   LDA  #$20  OUTPUT 1 SPACE 
+0543                         * 
+0544                         * 
+0545                         * OUTCH 
+0546                         * 
+0547                         * OUTPUT CHARACTER TO TERMINAL. 
+0548                         * THE CHAR. TO BE OUTPUT IS 
+0549                         * PASSED IN THE A REGISTER. 
+0550                         * ALL REGISTERS ARE PRESERVED. 
+0551                         * 
+0552 062A 34 12              OUTCH   PSHS A,X    SAVE A ACCUM AND IX 
+0553 062C BE 01 06                   LDX  CPORT  GET ADDR. OF TERMINAL 
+0554 062F A6 84              FETSTA  LDA  ,X     FETCH PORT STATUS 
+0555 0631 85 02                      BITA #2     TEST TDRE, OK TO XMIT ? 
+0556 0633 27 FA                      BEQ  FETSTA IF NOT LOOP UNTIL RDY 
+0557 0635 35 02                      PULS A      GET CHAR. FOR XMIT 
+0558 0637 A7 01                      STA  1,X    XMIT CHAR. 
+0559 0639 35 90                      PULS X,PC   RESTORE IX 
+0560                         * 
+0561                         * 
+0562 063B BE 01 06           ACINIZ  LDX  CPORT  POINT TO CONTROL PORT ADDRESS 
+0563 063E 86 03                      LDA  #3     RESET ACIA PORT CODE 
+0564 0640 A7 84                      STA  ,X     STORE IN CONTROL REGISTER 
+0565 0642 86 11                      LDA  #$11   SET 8 DATA, 2 STOP AN 0 PARITY 
+0566 0644 A7 84                      STA  ,X     STORE IN CONTROL REGISTER 
+0567 0646 6D 01                      TST  1,X    ANYTHING IN DATA REGISTER? 
+0568 0648 86 FF                      LDA  #$FF   TURN ON ECHO FLAG 
+0569 064A B7 01 08                   STA  ECHO 
+0570 064D 39                         RTS 
+0571                         *
+0572                         * MESSAGE STRINGS
+0573                         *
+0574 064E 0A 0D              TTLMSG FCB $0A,$0D
+0575 0650 43 4F 4D 50 41 43         FCC "COMPACT FLASH SECTOR READ/WRITE UTILITY"
+          54 20 46 4C 41 53
+          48 20 53 45 43 54
+          4F 52 20 52 45 41
+          44 2F 57 52 49 54
+          45 20 55 54 49 4C
+          49 54 59
+0576 0677 04                        FCB $04
+0577 0678 0A 0D              CMDMSG FCB $0A,$0D
+0578 067A 28 52 29 20 52 45         FCC "(R) READ SECTOR"
+          41 44 20 53 45 43
+          54 4F 52
+0579 0689 0A 0D                     FCB $0A,$0D
+0580 068B 28 57 29 20 57 52         FCC "(W) WRITE SECTOR"
+          49 54 45 20 53 45
+          43 54 4F 52
+0581 069B 0A 0D                     FCB $0A,$0D
+0582 069D 28 4E 29 20 4E 45         FCC "(N) NEXT SECTOR"
+          58 54 20 53 45 43
+          54 4F 52
+0583 06AC 0A 0D                     FCB $0A,$0D
+0584 06AE 28 50 29 20 50 52         FCC "(P) PREV SECTOR"
+          45 56 20 53 45 43
+          54 4F 52
+0585 06BD 0A 0D                     FCB $0A,$0D
+0586 06BF 28 4D 29 20 4D 4F         FCC "(M) MODIFY SECTOR"
+          44 49 46 59 20 53
+          45 43 54 4F 52
+0587 06D0 0A 0D                     FCB $0A,$0D
+0588 06D2 28 51 29 20 51 55         FCC "(Q) QUIT"
+          49 54
+0589 06DA 0A 0D                     FCB $0A,$0D
+0590 06DC 3A 20                     FCC ": "
+0591 06DE 04                        FCB $04
+0592 06DF 53 45 43 54 4F 52  SECPMT FCC "SECTOR NUMBER (6 HEX) : "
+          20 4E 55 4D 42 45
+          52 20 28 36 20 48
+          45 58 29 20 3A 20
+0593 06F7 04                        FCB $04
+0594 06F8 53 45 43 54 4F 52  SECMSG FCC "SECTOR NUMBER - $"
+          20 4E 55 4D 42 45
+          52 20 2D 20 24
+0595 0709 04                        FCB $04
+0596 070A 0D 0A              MEMMSG FCB $0D,$0A
+0597 070C 4D 45 4D 4F 52 59         FCC "MEMORY ADDRESS (3 HEX): "
+          20 41 44 44 52 45
+          53 53 20 28 33 20
+          48 45 58 29 3A 20
+0598 0724 04                        FCB $04
+0599 0725 20 2D 20           MSG5   FCC " - "
+0600 0728 04                        FCB $04
+0601 0729 00 00 0A 0D 00 00  MSG2   FCB $00,$00,$0A,$0D,$00,$00,$00,$04
+          00 04
+0602 0731 57 68 61 74 20 3F  WOTMSG FCC "What ?"
+0603 0737 0D 0A 04                  FCB $0D,$0A,$04
+0604                         *
+0605                                END START
+Program + Init Data = 1018 bytes
+Error count = 0

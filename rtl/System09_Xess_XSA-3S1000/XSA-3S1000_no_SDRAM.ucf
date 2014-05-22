@@ -1,0 +1,330 @@
+#####################################################
+#
+# XSA-3S1000 Board FPGA pin assignment constraints
+#
+#####################################################
+#
+# Clocks
+#
+#net CLKA          loc=T9  ; # 100MHz
+net CLKB          loc=P8  ; # 50MHz
+#net CLKC          loc=R9  ; # ??Mhz
+#
+# Push button switches
+#
+#NET SW1_3_N       loc=K2  ; # Flash Block select 
+#NET SW1_4_N       loc=J4  ; # Flash Block
+NET SW2_N         loc=E11 ; # active-low pushbutton 
+NET SW3_N         loc=A13 ; # active-low pushbutton
+#
+# PS/2 Keyboard
+#
+net PS2_CLK       loc=B16 ; 
+net PS2_DAT       loc=E13 ; 
+#
+# VGA Outputs
+#
+NET VGA_BLUE<0>   LOC=C9  ;        
+NET VGA_BLUE<1>   LOC=E7  ;        
+NET VGA_BLUE<2>   LOC=D5  ;        
+NET VGA_GREEN<0>  LOC=A8  ;        
+NET VGA_GREEN<1>  LOC=A5  ;        
+NET VGA_GREEN<2>  LOC=C3  ;        
+NET VGA_RED<0>    LOC=C8  ;        
+NET VGA_RED<1>    LOC=D6  ;        
+NET VGA_RED<2>    LOC=B1  ;        
+NET VGA_HSYNC_N   LOC=B7  ;        
+NET VGA_VSYNC_N   LOC=D8  ;        
+#
+# Manually assign locations for the DCMs along the bottom of the FPGA
+# because PAR sometimes places them in opposing corners and that ruins the clocks.
+#
+#INST "u1/gen_dlls.dllint" LOC="DCM_X0Y0";
+#INST "u1/gen_dlls.dllext" LOC="DCM_X1Y0";
+#
+#INST "u1/dllint" LOC="DCM_X0Y0";
+#INST "u1/dllext" LOC="DCM_X1Y0";
+# Manually assign locations for the DCMs along the bottom of the FPGA
+# because PAR sometimes places them in opposing corners and that ruins the clocks.
+#INST "u2_dllint" LOC="DCM_X0Y0";
+#INST "u2_dllext" LOC="DCM_X1Y0";
+#
+# SDRAM memory pin assignments
+#
+#net SDRAM_clkfb  loc=N8  ;  # feedback SDRAM clock after PCB delays
+#net SDRAM_clkout loc=E10 ; # clock to SDRAM
+#net SDRAM_CKE    loc=D7  ;  # SDRAM clock enable
+#net SDRAM_CS_N   loc=B8  ;  # SDRAM chip-select
+#net SDRAM_RAS_N  loc=A9  ;  
+#net SDRAM_CAS_N  loc=A10 ; 
+#net SDRAM_WE_N   loc=B10 ; 
+#net SDRAM_DQMH   loc=D9  ;  
+#net SDRAM_DQML   loc=C10 ; 
+#net SDRAM_A<0>   loc=B5  ;  
+#net SDRAM_A<1>   loc=A4  ;  
+#net SDRAM_A<2>   loc=B4  ;  
+#net SDRAM_A<3>   loc=E6  ;  
+#net SDRAM_A<4>   loc=E3  ;  
+#net SDRAM_A<5>   loc=C1  ;  
+#net SDRAM_A<6>   loc=E4  ;  
+#net SDRAM_A<7>   loc=D3  ;  
+#net SDRAM_A<8>   loc=C2  ;  
+#net SDRAM_A<9>   loc=A3  ;  
+#net SDRAM_A<10>  loc=B6  ;  
+#net SDRAM_A<11>  loc=C5  ;  
+#net SDRAM_A<12>  loc=C6  ;  
+#net SDRAM_D<0>   loc=C15 ; 
+#net SDRAM_D<1>   loc=D12 ; 
+#net SDRAM_D<2>   loc=A14 ; 
+#net SDRAM_D<3>   loc=B13 ; 
+#net SDRAM_D<4>   loc=D11 ; 
+#net SDRAM_D<5>   loc=A12 ; 
+#net SDRAM_D<6>   loc=C11 ; 
+#net SDRAM_D<7>   loc=D10 ; 
+#net SDRAM_D<8>   loc=B11 ; 
+#net SDRAM_D<9>   loc=B12 ; 
+#net SDRAM_D<10>  loc=C12 ; 
+#net SDRAM_D<11>  loc=B14 ; 
+#net SDRAM_D<12>  loc=D14 ; 
+#net SDRAM_D<13>  loc=C16 ; 
+#net SDRAM_D<14>  loc=F12 ; 
+#net SDRAM_D<15>  loc=F13 ; 
+#net SDRAM_BA<0>  loc=A7  ;  
+#net SDRAM_BA<1>  loc=C7  ;  
+#
+# Flash memory interface
+#
+#net FLASH_A<0>   LOC=N5  ;
+#net FLASH_A<1>   LOC=K14 ;
+#net FLASH_A<2>   LOC=K13 ;
+#net FLASH_A<3>   LOC=K12 ;
+#net FLASH_A<4>   LOC=L14 ;
+#net FLASH_A<5>   LOC=M16 ;
+#net FLASH_A<6>   LOC=L13 ;
+#net FLASH_A<7>   LOC=N16 ;
+#net FLASH_A<8>   LOC=N14 ;
+#net FLASH_A<9>   LOC=P15 ;
+#net FLASH_A<10>  LOC=R16 ;
+#net FLASH_A<11>  LOC=P14 ;
+#net FLASH_A<12>  LOC=P13 ;
+#net FLASH_A<13>  LOC=N12 ;
+#net FLASH_A<14>  LOC=T14 ;
+#net FLASH_A<15>  LOC=R13 ;
+#net FLASH_A<16>  LOC=N10 ;
+#net FLASH_A<17>  LOC=M14 ;
+#net FLASH_A<18>  LOC=K3  ;
+#net FLASH_A<19>  LOC=K4  ;
+#
+#net FLASH_D<0>   LOC=M11 ;
+#net FLASH_D<1>   LOC=N11 ;
+#net FLASH_D<2>   LOC=P10 ;
+#net FLASH_D<3>   LOC=R10 ;
+#net FLASH_D<4>   LOC=T7  ;
+#net FLASH_D<5>   LOC=R7  ;
+#net FLASH_D<6>   LOC=N6  ;
+#net FLASH_D<7>   LOC=M6  ;
+#net FLASH_D<8>   LOC=T4  ;
+#net FLASH_D<9>   LOC=R5  ;
+#net FLASH_D<10>  LOC=T5  ;
+#net FLASH_D<11>  LOC=P6  ;
+#net FLASH_D<12>  LOC=M7  ;
+#net FLASH_D<13>  LOC=R6  ;
+#net FLASH_D<14>  LOC=N7  ;
+#net FLASH_D<15>  LOC=P7  ;
+net FLASH_CE_N   LOC=R4  ;
+#net FLASH_OE_N   LOC=P5  ;
+#net FLASH_WE_N   LOC=M13 ;
+#net FLASH_BYTE_N LOC=T8  ;
+#net FLASH_RDY    LOC=L12 ;
+#net FLASH_RST_N  LOC=P16 ;
+#
+# FPGA Programming interface
+#
+#net FPGA_D<0>    LOC=M11 ; # shared with FLASH_D0, S1, LED_C
+#net FPGA_D<1>    LOC=N11 ; # shared with FLASH_D1, S7, LED_DP
+#net FPGA_D<2>    LOC=P10 ; # shared with FLASH_D2, S4, LED_B
+#net FPGA_D<3>    LOC=R10 ; # shared with FLASH_D3, S6, LED_A
+#net FPGA_D<4>    LOC=T7  ; # shared with FLASH_D4, S5, LED_F
+#net FPGA_D<5>    LOC=R7  ; # shared with FLASH_D5, S3, LED_G
+#net FPGA_D<6>    LOC=N6  ; # shared with FLASH_D6, S2, LED_E
+#net FPGA_D<7>    LOC=M6  ; # shared with FLASH_D7, S0, LED_D
+#net FPGA_CCLK    LOC=T15 ;
+#net FPGA_DONE    LOC=R14 ;
+#net FPGA_INIT_N  LOC=N9  ;
+#net FPGA_PROG_N	LOC=B3  ;
+#net FPGA_TCK	   LOC=C14 ;
+#net FPGA_TDI	   LOC=A2  ;
+#net FPGA_TDI_CSN	LOC=R3  ;
+#net FPGA_TDO	   LOC=A15 ;
+#net FPGA_TDO_WRN	LOC=T3  ;
+#net FPGA_TMS	   LOC=C13 ;
+#net FPGA_TMS_BSY	LOC=P9  ;
+#
+# Status LED
+#
+net S<0>          loc=M6  ; # FPGA_D7, LED_D 
+net S<1>          loc=M11 ; # FPGA_D0, LED_C 
+net S<2>          loc=N6  ; # FPGA_D6, LED_E 
+net S<3>          loc=R7  ; # FPGA_D5, LED_G  
+net S<4>          loc=P10 ; # FPGA_D2, LED_B 
+net S<5>          loc=T7  ; # FPGA_D4, LED_F  
+net S<6>          loc=R10 ; # FPGA_D3, LED_A
+net S<7>          loc=N11 ; # FPGA_D1, LED_DP 
+#
+# Parallel Port
+#
+#net PPORT_load    loc=N14 ;
+#net PPORT_clk     loc=P15 ;
+#net PPORT_din<0>  loc=R16 ;
+#net PPORT_din<1>  loc=P14 ;
+#net PPORT_din<2>  loc=P13 ;
+#net PPORT_din<3>  loc=N12 ;
+#
+#net PPORT_dout<0> loc=N5  ;
+#net PPORT_dout<1> loc=K14 ;
+#net PPORT_dout<2> loc=K13 ;
+#net PPORT_dout<3> loc=T10 ;
+#
+#net PPORT_d<0>    loc=N14 ; # FLASH_A<8>  / PPORT_LOAD
+#net PPORT_d<1>    loc=P15 ; # FLASH_A<9>  / PPORT_CLK
+#net PPORT_d<2>    loc=R16 ; # FLASH_A<10> / PPORT_DIN<0>
+#net PPORT_d<3>    loc=P14 ; # FLASH_A<11> / PPORT_DIN<1>
+#net PPORT_d<4>    loc=P13 ; # FLASH_A<12> / PPORT_DIN<2>
+#net PPORT_d<5>    loc=N12 ; # FLASH_A<13> / PPORT_DIN<3>
+##net PPORT_d<6>    loc=T14 ; # FLASH_A<14>
+##net PPORT_d<7>    loc=R13 ; # FLASH_A<15>
+#
+#net PPORT_s<3>    loc=N5  ; # FLASH_A<0> / PPORT_DOUT<0>
+#net PPORT_s<4>    loc=K14 ; # FLASH_A<1> / PPORT_DOUT<1>
+#net PPORT_s<5>    loc=K13 ; # FLASH_A<2> / PPORT_DOUT<2>
+#net PPORT_s<6>    loc=T10 ; #            / PPORT_DOUT<3>
+#
+########################################################
+#
+# XST3.0 pins
+#
+########################################################
+#
+# BAR LED
+#
+#net BAR<1>         loc=L5  ; # bar led 1, PB_A0
+#net BAR<2>         loc=N2  ; # bar led 2, PB_A1
+#net BAR<3>         loc=M3  ; # bar led 3, PB_A2
+#net BAR<4>         loc=N1  ; # bar led 4, PB_A3
+#net BAR<5>         loc=T13 ; # bar led 5, PB_A4
+#net BAR<6>         loc=L15 ; # bar led 6,  ETHER_IRQ
+#net BAR<7>         loc=J13 ; # bar led 7,  USB_IRQ_N
+#net BAR<8>         loc=H15 ; # bar led 8,  IDE_IRQ
+#net BAR<9>         loc=J16 ; # bar led 9,  SLOT1_IRQ
+#net BAR<10>        loc=J14 ; # bar led 10, SLOT2_IRQ
+#
+# Push Buttons
+#
+#net PB1_N          loc=H4  ; # Shared with PB_D15
+#net PB2_N          loc=L5  ; # Shared with BAR1, PB_A0
+#net PB3_N          loc=N2  ; # Shared with BAR2, PB_A1  
+#net PB4_N          loc=M3  ; # Shared with BAR3, PB_A2 
+#
+# RS232 PORT
+#
+net RS232_TXD      loc=J2  ; # RS232 TD pin 3
+net RS232_RXD      loc=G5  ; # RS232 RD pin 2
+net RS232_CTS      loc=D1  ; # RS232 CTS
+net RS232_RTS      loc=F4  ; # RS232 RTS
+#
+# 16 Bit Peripheral Bus
+#
+# 5-bit Peripheral address bus
+net PB_A<0>        loc=L5  ; # Shared with BAR1, PB2
+net PB_A<1>        loc=N2  ; # Shared with BAR2, PB3  
+net PB_A<2>        loc=M3  ; # Shared with BAR3, PB4  
+net PB_A<3>        loc=N1  ; # Shared with BAR4  
+net PB_A<4>        loc=T13 ; # Shared with BAR5
+# 16-bit peripheral data bus  
+net PB_D<0>        loc=P12 ; # Shared with DIPSW1
+net PB_D<1>        loc=J1  ; # Shared with DIPSW2  
+net PB_D<2>        loc=H1  ; # Shared with DIPSW3  
+net PB_D<3>        loc=H3  ; # Shared with DIPSW4  
+net PB_D<4>        loc=G2  ; # Shared with DIPSW5  
+net PB_D<5>        loc=K15 ; # Shared with DIPSW6 
+net PB_D<6>        loc=K16 ; # Shared with DIPSW7 
+net PB_D<7>        loc=F15 ; # Shared with DIPSW8 
+net PB_D<8>        loc=E2  ; # Shared with LED2_A
+net PB_D<9>        loc=E1  ; # Shared with LED2_B  
+net PB_D<10>       loc=F3  ; # Shared with LED2_C  
+net PB_D<11>       loc=F2  ; # Shared with LED2_D  
+net PB_D<12>       loc=G4  ; # Shared with LED2_E  
+net PB_D<13>       loc=G3  ; # Shared with LED2_F  
+net PB_D<14>       loc=G1  ; # Shared with LED2_G 
+net PB_D<15>       loc=H4  ; # Shared with LED2_DP, PB1  
+net PB_RD_N        loc=P2  ; # disk I/O read control
+net PB_WR_N        loc=R1  ; # disk I/O write control
+#
+# IDE Interface
+#
+net IDE_CS0_N      loc=G15 ; # disk register-bank select
+net IDE_CS1_N      loc=G14 ; # disk register-bank select
+net IDE_DMACK_N    loc=K1  ; # (out) IDE DMA acknowledge
+#net IDE_DMARQ      loc=L4  ; # (in) IDE DMA request
+#net IDE_IORDY      loc=L2  ; # (in) IDE IO ready
+#net IDE_IRQ        loc=H15 ; # (in) IDE interrupt # shared with BAR8
+#
+# Ethernet Controller
+# Disable if not used
+#
+net ether_cs_n    loc=G13 ; # (out)Ethernet chip-enable 
+#net ether_aen     loc=E14 ; # (out) Ethernet address enable not 
+#net ether_bhe_n   loc=J3  ; # (out) Ethernet bus high enable 
+#net ether_clk     loc=R9  ; # (in)  Ethernet clock 
+#net ether_irq     loc=L15 ; # (in)  Ethernet irq - Shared with BAR6
+#net ether_rdy     loc=M2  ; # (in)  Ethernet ready
+#
+# Expansion slots
+#
+net slot1_cs_n    loc=E15 ; # (out)
+#net slot1_irq     loc=J16 ; # (in) Shared with BAR9
+net slot2_cs_n    loc=D16 ; # (out)
+#net slot2_irq     loc=J14 ; # (in)	Shared with BAR10
+#
+# Audio codec
+#
+#net audio_lrck    loc=R12 ; # (out)
+#net audio_mclk    loc=P11 ; # (out)
+#net audio_sclk    loc=T12 ; # (out)
+#net audio_sdti    loc=M10 ; # (out)
+#net audio_sdto    loc=K5  ; # (in)
+#
+# i2c
+#
+#net i2c_scl       loc=F5  ; #(out)
+#net i2c_sda       loc=D2  ; # (in/out)
+#
+# USB
+#
+#NET USB_CLK       LOC=M1  ; # (IN)
+#NET USB_IRQ_N     LOC=J13 ; # (IN) Shared with BAR7
+#NET USB_SUSPEND   LOC=l3  ; # (IN)
+#
+# VIDEO DIGITIZER
+#
+#NET VIDIN_AVID    LOC=    ; # (IN)
+#NET VIDIN_CLK     LOC=H16 ; # (IN)
+#NET VIDIN_FID     LOC=    ; # (IN)
+#NET VIDIN_HSYNC   LOC=    ; # (IN)
+#NET VIDIN_IRQ     LOC=    ; # (IN)
+#NET VIDIN_VSYNC   LOC=    ; # (IN)
+#NET VIDIN_Y<0>    LOC=H14 ; # (IN) Shared with LED1_A
+#NET VIDIN_Y<1>    LOC=M4  ; # (IN) Shared with LED1_B
+#NET VIDIN_Y<2>    LOC=P1  ; # (IN) Shared with LED1_C
+#NET VIDIN_Y<3>    LOC=N3  ; # (IN) Shared with LED1_D
+#NET VIDIN_Y<4>    LOC=M15 ; # (IN) Shared with LED1_E
+#NET VIDIN_Y<5>    LOC=H13 ; # (IN) Shared with LED1_F
+#NET VIDIN_Y<6>    LOC=G16 ; # (IN) Shared with LED1_G
+#NET VIDIN_Y<7>    LOC=N15 ; # (IN) Shared with LED1_DP
+#
+# Timing Constraints
+#
+#NET "CLKA" TNM_NET="CLKA"; 
+#TIMESPEC "TS_clk"=PERIOD "CLKA" 10 ns HIGH 50 %; 
+NET "CLKB" TNM_NET="CLKB"; 
+TIMESPEC "TS_clk"=PERIOD "CLKB" 20 ns HIGH 50 %; 

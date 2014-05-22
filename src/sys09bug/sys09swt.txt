@@ -1,0 +1,5 @@
+ NAM SYS09BUG FOR SWTPc
+ INCLUDE "opt_swt.txt"
+ INCLUDE "sys09equ.txt"
+ INCLUDE "sys09bug.txt"
+ END 
